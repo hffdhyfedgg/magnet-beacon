@@ -2,7 +2,7 @@
 
 Это не структурированная старая версия кода реализующего оценку погрешностей и навигацию по магнитному маяку. Здесь будут приведены комментарии по файлам в проекте.
 
-Код основан на статье: 
+Код основан на статье: https://www.researchgate.net/profile/Shuang-Song-28/publication/258793107_An_Electromagnetic_Localization_and_Orientation_Method_Based_on_Rotating_Magnetic_Dipole/links/5834f49108aef19cb81f9218/An-Electromagnetic-Localization-and-Orientation-Method-Based-on-Rotating-Magnetic-Dipole.pdf
 
 Код в проекте может содержать ошибки или устаревшие/не работающие реализации, но основные проекты работают без проблем.
 
