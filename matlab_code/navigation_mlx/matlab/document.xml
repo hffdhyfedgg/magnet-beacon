@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="heading"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Использование формул из статьи без изменений</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Начальные данные</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[%clear
+syms y real
+syms x z real positive
+Bm = sym('Bm','real');%Амплитуда
+%f = sym("f",'real');%Частота
+alf = sym('alpha', {'real'})
+bet = sym('beta', {'real'})
+gam = sym('gamma', {'real'})
+%assumptions
+%syms t real %Время]]></w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Рассчёты</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>    1. Нахождение a,b параметров</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[R = ...
+   [cos(gam),   -sin(gam),  0;...
+    sin(gam),   cos(gam),   0;...
+    0,          0,          1]*...
+   [cos(bet),   0,          sin(bet);...
+    0,          1,          0;...
+    -sin(bet),  0,          cos(bet);]*...
+   [1,          0,          0;...
+    0,          cos(alf),   -sin(alf);...
+    0,          sin(alf),   cos(alf);]
+%Кусочек нужный для фаз маяка, используя модель магнитных линий
+syms w t real
+simplify(R*[cos(w*t)+sin(w*t);cos(w*t)+sin(w*t);cos(w*t)+sin(w*t)])
+%
+r = norm([x,y,z])
+u = x/r;
+v = y/r;
+w = z/r;
+B = (Bm/r^3).*...
+   [3*u*v,      3*u^2-1;...
+    3*v^2-1,    3*u*v;...
+    3*v*w,      3*u*w]
+V = R*B
+%GenV = matlabFunction(V);
+%save GenV
+syms ax ay az bx by bz real
+aa = [ax,ay,az];
+bb = [bx,by,bz];
+
+%{
+out = simplify(1/( 1 - sqrt( (sum(aa.^2) - sum(bb.^2) )^2 + 4*(sum(aa.*bb))^2 )/(sum(aa.^2) + sum(bb.^2)) ))
+
+dax = diff(out, ax)
+fplot(subs(dax, [ay, az, bx, by, bz], [1, 1, 1, 1, 1]));
+day = diff(out, ay)
+daz = diff(out, az)
+
+dbx = diff(out, bx)
+dby = diff(out, by)
+dbz = diff(out, bz)
+%}
+
+
+
+%a(1) = ab.a1;   a(2) = ab.a2;   a(3) = ab.a3;
+%b(1) = ab.b1;   b(2) = ab.b2;   b(3) = ab.b3;
+
+%aa(1) = V(1,1);   aa(2) = V(2,1);   aa(3) = V(3,1);
+%bb(1) = V(1,2);   bb(2) = V(2,2);   bb(3) = V(3,2);
+
+%{
+disp("Обычный расчёт")
+aa = double(subs(a,[x, y, z, Bm, alf, bet, gam],[2, 2, 2, 1, deg2rad([25, 10, 10])]));
+bb = double(subs(b,[x, y, z, Bm, alf, bet, gam],[2, 2, 2, 1, deg2rad([10, 10, 10])]));
+
+BB = double(subs(B,[x, y, z, Bm],[2, 2, 2, 1]));
+
+disp("Амплитуды В")
+sqrt(BB(:,1).^2+BB(:,2).^2)
+
+disp("Фаза В")
+tan(BB(:,2)./BB(:,1))
+
+disp("Норма В")
+norm(sqrt(BB(:,1).^2+BB(:,2).^2))
+
+disp("Амплитуды V")
+sqrt(aa.^2+bb.^2)
+
+disp("Фазы V")
+tan(bb./aa)
+
+disp("Норма V")
+norm(sqrt(aa.^2+bb.^2))
+
+clear aa bb
+clear BB
+%}]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>       2.1 Получение координат объекта</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[r = ( (2 * Bm^2) / ( sum(aa.^2) + sum(bb.^2) - sqrt( (sum(aa.^2) - sum(bb.^2))^2 + 4*sum( aa.*bb )^2 ) ) ) ^ (1 / 6)
+u = sqrt( (r^6)*sum(aa.^2) / (3*Bm^2) - 1/3 )
+v = sqrt( (r^6)*sum(bb.^2) / (3*Bm^2) - 1/3 )
+w = sqrt(1-u^2-v^2)
+syms d d1 d2
+]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[syms tet nx ny nz real
+syms r [3,3] real
+n = [nx, ny, nz];
+r(tet, n) =...
+    [cos(tet)+(1-cos(tet))*nx^2, (1 - cos(tet))*nx*ny - sin(tet)*nz, (1 - cos(tet))*nz*nx + sin(tet)*ny;...
+     (1 - cos(tet))*ny*nx + sin(tet)*nz, cos(tet) + (1 - cos(tet))*ny^2, (1 - cos(tet))*ny*nz - sin(tet)*nx;...
+     (1 - cos(tet))*nz*nx - sin(tet)*ny, (1 - cos(tet))*nz*ny + sin(tet)*nx, cos(tet) + (1 - cos(tet))*nz^2]
+r(pi/2, 1,0,0)
+
+[x, y, z, angle] = AngNormal(r(pi/2, 1,0,0))
+%{
+result = fetchOutputs(sl)
+save D:\Bezmen\PavelSheptuhin\result.mat
+%}]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>       2.2 Получение матрицы поворота</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[c = cross(aa,bb)
+%c = a.*b;
+
+cc = cross(...
+    (Bm/r^3)*[3*u*v; 3*v^2-1; 3*v*w], ...
+    (Bm/r^3)*[3*u^2-1; 3*u*v; 3*u*w])
+
+%cc = (Bm/r^3)*[3*u*v; 3*v^2-1; 3*v*w].*(Bm/r^3).*[3*u^2-1; 3*u*v; 3*u*w];
+invMat = inv([ ...
+    (Bm/r^3)*[3*u*v; 3*v^2-1; 3*v*w], ...
+    (Bm/r^3)*[3*u^2-1; 3*u*v; 3*u*w], ...
+    cc]);
+R_r1 = [aa',bb',c']*invMat;%R result
+
+%simplify(R_r1 == R_r2);
+%CalcRotMatrix1 = matlabFunction(simplify(R_r1));
+%CalcRotMatrix2 = matlabFunction(simplify(R_r2));
+%save CalcRotMatrix1
+%save CalcRotMatrix2]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>    3. Численный рассчёт углов</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[%symvar
+num_R = double(subs(R_r,[x, y, z, Bm, alf, bet, gam],[1, 1, 1, 1, deg2rad([0, 90, 25])]))
+num_R_true = double(subs(R,[alf, bet, gam],[deg2rad([0, 90, 25])]))
+%num_R_alt = double(subs(R_alt,[x, y, z, Bm, alf, bet, gam],[1, 1, 1, 1, deg2rad([15, 15, 15])]))
+
+num_bet = -asin(num_R(3,1));
+
+if abs(num_bet) ~= pi/2
+    num_alf1=asin(num_R(3,2)/sqrt(1-num_R(3,1)^2));
+    num_alf2=pi*sign(num_R(3,2))-asin(num_R(3,2)/sqrt(1-num_R(3,1)^2));
+    if num_R(3,3) >= 0
+        num_alf = num_alf1;
+    else
+        num_alf = num_alf2;
+    end
+    
+    if num_R(1,1) >= 0
+        num_gam = asin(num_R(2,1)/sqrt(1-num_R(3,1)^2));
+    else
+        num_gam = pi*sign(num_R(2,1))-asin(num_R(2,1)/sqrt(1-num_R(3,1)^2));
+    end
+else
+    num_alf = 0;
+    if num_R(2,2) >= 0
+        num_gam = -asin(num_R(1,2));
+    else
+        num_gam = -pi*sign(num_R(1,2))+asin(num_R(1,2));
+    end
+end
+
+disp(rad2deg([num_alf,num_bet,num_gam]))
+
+]]></w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t></w:t></w:r></w:p></w:body></w:document>

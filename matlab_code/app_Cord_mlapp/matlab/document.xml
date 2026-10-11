@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[classdef app_Cord < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure       matlab.ui.Figure
+        GridLayout     matlab.ui.container.GridLayout
+        LeftPanel      matlab.ui.container.Panel
+        axLabel        matlab.ui.control.Label
+        axSlider       matlab.ui.control.Slider
+        ayLabel        matlab.ui.control.Label
+        aySlider       matlab.ui.control.Slider
+        azSliderLabel  matlab.ui.control.Label
+        azSlider       matlab.ui.control.Slider
+        bxSliderLabel  matlab.ui.control.Label
+        bxSlider       matlab.ui.control.Slider
+        bySliderLabel  matlab.ui.control.Label
+        bySlider       matlab.ui.control.Slider
+        bzSliderLabel  matlab.ui.control.Label
+        bzSlider       matlab.ui.control.Slider
+        BSliderLabel   matlab.ui.control.Label
+        BSlider        matlab.ui.control.Slider
+        RightPanel     matlab.ui.container.Panel
+        UIAxes         matlab.ui.control.UIAxes
+        SliderLabel    matlab.ui.control.Label
+        Slider         matlab.ui.control.Slider
+        HomeButton     matlab.ui.control.Button
+        XLabel         matlab.ui.control.Label
+        ReXDataLabel   matlab.ui.control.Label
+        YLabel         matlab.ui.control.Label
+        ReYDataLabel   matlab.ui.control.Label
+        ZLabel         matlab.ui.control.Label
+        ReZDataLabel   matlab.ui.control.Label
+        ImXDataLabel   matlab.ui.control.Label
+        ImYDataLabel   matlab.ui.control.Label
+        ImZDataLabel   matlab.ui.control.Label
+        Label          matlab.ui.control.Label
+        Label_2        matlab.ui.control.Label
+        UITable        matlab.ui.control.Table
+        UIAxes_2       matlab.ui.control.UIAxes
+    end
+
+    % Properties that correspond to apps with auto-reflow
+    properties (Access = private)
+        onePanelWidth = 576;
+    end
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Value changed function: BSlider, Slider, axSlider, 
+        % aySlider, azSlider, bxSlider, bySlider, bzSlider
+        function axSliderValueChanged(app, event)
+            ax = app.axSlider.Value;
+            ay = app.aySlider.Value;
+            az = app.azSlider.Value;
+            bx = app.bxSlider.Value;
+            by = app.bySlider.Value;
+            bz = app.bzSlider.Value;
+            B = app.BSlider.Value;
+            M = app.Slider.Value;
+            re_x = real(CalcX(B,ax,ay,az,bx,by,bz));
+            re_y = real(CalcY(B,ax,ay,az,bx,by,bz));
+            re_z = real(CalcZ(B,ax,ay,az,bx,by,bz));
+            re_R = real(CalcRotMatrix(B,ax,ay,az,bx,by,bz));
+            
+            im_x = imag(CalcX(B,ax,ay,az,bx,by,bz));
+            im_y = imag(CalcY(B,ax,ay,az,bx,by,bz));
+            im_z = imag(CalcZ(B,ax,ay,az,bx,by,bz));
+            im_R = imag(CalcRotMatrix(B,ax,ay,az,bx,by,bz));
+            
+            app.UITable.Data = re_R;
+            app.ReXDataLabel.Text = num2str(re_x);
+            app.ReYDataLabel.Text = num2str(re_y);
+            app.ReZDataLabel.Text = num2str(re_z);
+            
+            plot3(app.UIAxes, [re_x, M*(re_x+re_R(1,1))],[re_y, M*(re_y+re_R(1,2))],[re_z, M*(re_z+re_R(1,3))],"red");
+            hold(app.UIAxes);
+            plot3(app.UIAxes, [re_x, M*(re_x+re_R(2,1))],[re_y, M*(re_y+re_R(2,2))],[re_z, M*(re_z+re_R(2,3))],"yellow");
+            plot3(app.UIAxes, [re_x, M*(re_x+re_R(3,1))],[re_y, M*(re_y+re_R(3,2))],[re_z, M*(re_z+re_R(3,3))],"blue");
+           
+            %app.UITable.Data = re_R;            
+            app.ImXDataLabel.Text = num2str(im_x);
+            app.ImYDataLabel.Text = num2str(im_y);
+            app.ImZDataLabel.Text = num2str(im_z);
+            
+            
+            plot3(app.UIAxes_2, [im_x, M*(im_x+im_R(1,1))],[im_y, M*(im_y+im_R(1,2))],[im_z, M*(im_z+im_R(1,3))],"red");
+            hold(app.UIAxes_2);
+            plot3(app.UIAxes_2, [im_x, M*(im_x+im_R(2,1))],[im_y, M*(im_y+im_R(2,2))],[im_z, M*(im_z+im_R(2,3))],"yellow");
+            plot3(app.UIAxes_2, [im_x, M*(im_x+im_R(3,1))],[im_y, M*(im_y+im_R(3,2))],[im_z, M*(im_z+im_R(3,3))],"blue");
+        end
+
+        % Button pushed function: HomeButton
+        function HomeButtonPushed(app, event)
+            ax = app.axSlider.Value;
+            ay = app.aySlider.Value;
+            az = app.azSlider.Value;
+            bx = app.bxSlider.Value;
+            by = app.bySlider.Value;
+            bz = app.bzSlider.Value;
+            B = app.BSlider.Value;
+           
+            re_x = real(CalcX(B,ax,ay,az,bx,by,bz));
+            re_y = real(CalcY(B,ax,ay,az,bx,by,bz));
+            re_z = real(CalcZ(B,ax,ay,az,bx,by,bz));
+            im_x = imag(CalcX(B,ax,ay,az,bx,by,bz));
+            im_y = imag(CalcY(B,ax,ay,az,bx,by,bz));
+            im_z = imag(CalcZ(B,ax,ay,az,bx,by,bz));
+            try
+                app.UIAxes.XLim = [-5 5]+re_x;
+                app.UIAxes.YLim = [-5 5]+re_y;
+                app.UIAxes.ZLim = [-5 5]+re_z;
+                app.UIAxes_2.XLim = [-5 5]+im_x;
+                app.UIAxes_2.YLim = [-5 5]+im_y;
+                app.UIAxes_2.ZLim = [-5 5]+im_z;
+            catch
+                
+            end
+        end
+
+        % Changes arrangement of the app based on UIFigure width
+        function updateAppLayout(app, event)
+            currentFigureWidth = app.UIFigure.Position(3);
+            if(currentFigureWidth <= app.onePanelWidth)
+                % Change to a 2x1 grid
+                app.GridLayout.RowHeight = {538, 538};
+                app.GridLayout.ColumnWidth = {'1x'};
+                app.RightPanel.Layout.Row = 2;
+                app.RightPanel.Layout.Column = 1;
+            else
+                % Change to a 1x2 grid
+                app.GridLayout.RowHeight = {'1x'};
+                app.GridLayout.ColumnWidth = {256, '1x'};
+                app.RightPanel.Layout.Row = 1;
+                app.RightPanel.Layout.Column = 2;
+            end
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure and hide until all components are created
+            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.AutoResizeChildren = 'off';
+            app.UIFigure.Position = [100 100 990 538];
+            app.UIFigure.Name = 'UI Figure';
+            app.UIFigure.SizeChangedFcn = createCallbackFcn(app, @updateAppLayout, true);
+
+            % Create GridLayout
+            app.GridLayout = uigridlayout(app.UIFigure);
+            app.GridLayout.ColumnWidth = {256, '1x'};
+            app.GridLayout.RowHeight = {'1x'};
+            app.GridLayout.ColumnSpacing = 0;
+            app.GridLayout.RowSpacing = 0;
+            app.GridLayout.Padding = [0 0 0 0];
+            app.GridLayout.Scrollable = 'on';
+
+            % Create LeftPanel
+            app.LeftPanel = uipanel(app.GridLayout);
+            app.LeftPanel.Layout.Row = 1;
+            app.LeftPanel.Layout.Column = 1;
+
+            % Create axLabel
+            app.axLabel = uilabel(app.LeftPanel);
+            app.axLabel.HorizontalAlignment = 'right';
+            app.axLabel.Position = [11 486 49 22];
+            app.axLabel.Text = 'ax [нТл]';
+
+            % Create axSlider
+            app.axSlider = uislider(app.LeftPanel);
+            app.axSlider.Limits = [0.1 100];
+            app.axSlider.ValueChangedFcn = createCallbackFcn(app, @axSliderValueChanged, true);
+            app.axSlider.Position = [81 495 150 3];
+            app.axSlider.Value = 100;
+
+            % Create ayLabel
+            app.ayLabel = uilabel(app.LeftPanel);
+            app.ayLabel.HorizontalAlignment = 'right';
+            app.ayLabel.Position = [14 427 49 22];
+            app.ayLabel.Text = 'ay [нТл]';
+
+            % Create aySlider
+            app.aySlider = uislider(app.LeftPanel);
+            app.aySlider.Limits = [0.1 100];
+            app.aySlider.ValueChangedFcn = createCallbackFcn(app, @axSliderValueChanged, true);
+            app.aySlider.Position = [84 436 150 3];
+            app.aySlider.Value = 100;
+
+            % Create azSliderLabel
+            app.azSliderLabel = uilabel(app.LeftPanel);
+            app.azSliderLabel.HorizontalAlignment = 'right';
+            app.azSliderLabel.Position = [11 358 49 22];
+            app.azSliderLabel.Text = 'az [нТл]';
+
+            % Create azSlider
+            app.azSlider = uislider(app.LeftPanel);
+            app.azSlider.Limits = [0.1 100];
+            app.azSlider.ValueChangedFcn = createCallbackFcn(app, @axSliderValueChanged, true);
+            app.azSlider.Position = [81 367 150 3];
+            app.azSlider.Value = 100;
+
+            % Create bxSliderLabel
+            app.bxSliderLabel = uilabel(app.LeftPanel);
+            app.bxSliderLabel.HorizontalAlignment = 'right';
+            app.bxSliderLabel.Position = [11 289 49 22];
+            app.bxSliderLabel.Text = 'bx [нТл]';
+
+            % Create bxSlider
+            app.bxSlider = uislider(app.LeftPanel);
+            app.bxSlider.Limits = [0.1 100];
+            app.bxSlider.ValueChangedFcn = createCallbackFcn(app, @axSliderValueChanged, true);
+            app.bxSlider.Position = [81 298 150 3];
+            app.bxSlider.Value = 100;
+
+            % Create bySliderLabel
+            app.bySliderLabel = uilabel(app.LeftPanel);
+            app.bySliderLabel.HorizontalAlignment = 'right';
+            app.bySliderLabel.Position = [12 227 49 22];
+            app.bySliderLabel.Text = 'by [нТл]';
+
+            % Create bySlider
+            app.bySlider = uislider(app.LeftPanel);
+            app.bySlider.Limits = [0.1 100];
+            app.bySlider.ValueChangedFcn = createCallbackFcn(app, @axSliderValueChanged, true);
+            app.bySlider.Position = [82 236 150 3];
+            app.bySlider.Value = 100;
+
+            % Create bzSliderLabel
+            app.bzSliderLabel = uilabel(app.LeftPanel);
+            app.bzSliderLabel.HorizontalAlignment = 'right';
+            app.bzSliderLabel.Position = [15 163 49 22];
+            app.bzSliderLabel.Text = 'bz [нТл]';
+
+            % Create bzSlider
+            app.bzSlider = uislider(app.LeftPanel);
+            app.bzSlider.Limits = [0.1 100];
+            app.bzSlider.ValueChangedFcn = createCallbackFcn(app, @axSliderValueChanged, true);
+            app.bzSlider.Position = [85 172 150 3];
+            app.bzSlider.Value = 100;
+
+            % Create BSliderLabel
+            app.BSliderLabel = uilabel(app.LeftPanel);
+            app.BSliderLabel.HorizontalAlignment = 'right';
+            app.BSliderLabel.Position = [20 101 44 22];
+            app.BSliderLabel.Text = 'B [нТл]';
+
+            % Create BSlider
+            app.BSlider = uislider(app.LeftPanel);
+            app.BSlider.Limits = [1 100];
+            app.BSlider.ValueChangedFcn = createCallbackFcn(app, @axSliderValueChanged, true);
+            app.BSlider.Position = [85 110 150 3];
+            app.BSlider.Value = 1;
+
+            % Create RightPanel
+            app.RightPanel = uipanel(app.GridLayout);
+            app.RightPanel.Layout.Row = 1;
+            app.RightPanel.Layout.Column = 2;
+
+            % Create UIAxes
+            app.UIAxes = uiaxes(app.RightPanel);
+            title(app.UIAxes, 'Real')
+            xlabel(app.UIAxes, 'X [м]')
+            ylabel(app.UIAxes, 'Y [м]')
+            app.UIAxes.XGrid = 'on';
+            app.UIAxes.XMinorGrid = 'on';
+            app.UIAxes.YGrid = 'on';
+            app.UIAxes.YMinorGrid = 'on';
+            app.UIAxes.ZGrid = 'on';
+            app.UIAxes.ZMinorGrid = 'on';
+            app.UIAxes.Position = [55 281 300 185];
+
+            % Create SliderLabel
+            app.SliderLabel = uilabel(app.RightPanel);
+            app.SliderLabel.HorizontalAlignment = 'right';
+            app.SliderLabel.Position = [-1 496 57 22];
+            app.SliderLabel.Text = 'Масштаб';
+
+            % Create Slider
+            app.Slider = uislider(app.RightPanel);
+            app.Slider.Limits = [0.5 5];
+            app.Slider.ValueChangedFcn = createCallbackFcn(app, @axSliderValueChanged, true);
+            app.Slider.Position = [77 505 150 3];
+            app.Slider.Value = 0.5;
+
+            % Create HomeButton
+            app.HomeButton = uibutton(app.RightPanel, 'push');
+            app.HomeButton.ButtonPushedFcn = createCallbackFcn(app, @HomeButtonPushed, true);
+            app.HomeButton.Position = [272 495 100 22];
+            app.HomeButton.Text = 'Home';
+
+            % Create XLabel
+            app.XLabel = uilabel(app.RightPanel);
+            app.XLabel.Position = [11 226 25 22];
+            app.XLabel.Text = 'X';
+
+            % Create ReXDataLabel
+            app.ReXDataLabel = uilabel(app.RightPanel);
+            app.ReXDataLabel.Position = [67 227 42 22];
+            app.ReXDataLabel.Text = 'Label2';
+
+            % Create YLabel
+            app.YLabel = uilabel(app.RightPanel);
+            app.YLabel.Position = [11 205 25 22];
+            app.YLabel.Text = 'Y';
+
+            % Create ReYDataLabel
+            app.ReYDataLabel = uilabel(app.RightPanel);
+            app.ReYDataLabel.Position = [67 206 42 22];
+            app.ReYDataLabel.Text = 'Label2';
+
+            % Create ZLabel
+            app.ZLabel = uilabel(app.RightPanel);
+            app.ZLabel.Position = [11 184 25 22];
+            app.ZLabel.Text = 'Z';
+
+            % Create ReZDataLabel
+            app.ReZDataLabel = uilabel(app.RightPanel);
+            app.ReZDataLabel.Position = [67 185 42 22];
+            app.ReZDataLabel.Text = 'Label2';
+
+            % Create ImXDataLabel
+            app.ImXDataLabel = uilabel(app.RightPanel);
+            app.ImXDataLabel.Position = [196 226 42 22];
+            app.ImXDataLabel.Text = 'Label2';
+
+            % Create ImYDataLabel
+            app.ImYDataLabel = uilabel(app.RightPanel);
+            app.ImYDataLabel.Position = [196 205 42 22];
+            app.ImYDataLabel.Text = 'Label2';
+
+            % Create ImZDataLabel
+            app.ImZDataLabel = uilabel(app.RightPanel);
+            app.ImZDataLabel.Position = [196 184 42 22];
+            app.ImZDataLabel.Text = 'Label2';
+
+            % Create Label
+            app.Label = uilabel(app.RightPanel);
+            app.Label.Position = [68 248 93 22];
+            app.Label.Text = 'Реальная часть';
+
+            % Create Label_2
+            app.Label_2 = uilabel(app.RightPanel);
+            app.Label_2.Position = [196 248 84 22];
+            app.Label_2.Text = 'Мнимая часть';
+
+            % Create UITable
+            app.UITable = uitable(app.RightPanel);
+            app.UITable.ColumnName = {'x'; 'y'; 'z'};
+            app.UITable.RowName = {'m;n;p'};
+            app.UITable.Position = [46 33 227 152];
+
+            % Create UIAxes_2
+            app.UIAxes_2 = uiaxes(app.RightPanel);
+            title(app.UIAxes_2, 'Imag')
+            xlabel(app.UIAxes_2, 'X [м]')
+            ylabel(app.UIAxes_2, 'Y [м]')
+            app.UIAxes_2.XGrid = 'on';
+            app.UIAxes_2.XMinorGrid = 'on';
+            app.UIAxes_2.YGrid = 'on';
+            app.UIAxes_2.YMinorGrid = 'on';
+            app.UIAxes_2.ZGrid = 'on';
+            app.UIAxes_2.ZMinorGrid = 'on';
+            app.UIAxes_2.Position = [371 281 300 185];
+
+            % Show the figure after all components are created
+            app.UIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = app_Cord
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end]]></w:t></w:r></w:p></w:body></w:document>

@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Аналитический вывод формул для магнитной линии.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[%Выводим формулы магнитного маяка
+m0 = 4e-7*pi;%Магнитная постоянная
+mynorm = @(r) (sqrt(sum(r.^2)));
+
+l = sym('l', {'real'});
+t = sym('t', {'real'});
+rm = l.*[1, 0, 0];%Параметрически заданная кривая, описывающая соленоид
+x = sym('x',{'real'});
+y = sym('y',{'real'});
+z = sym('z',{'real'});
+r = [x, y, z];
+m = 1; %Модуль магнитного момента соленоида.
+%L = 0.25; %Длинна соленоида.
+L = sym('L', {'real'})
+ro = sym('rho', {'real'});
+Bmr = sym('Bmr', {'real'});
+rom = [1, 0, 0]; % Вектор магнитной плотности. Постоянен на всей длинне сленоида. 
+B1 = Bmr * (3*(r-rm)*dot(rom, (r-rm))/mynorm(r-rm)^5 - rom/mynorm(r-rm)^3)%Bmr = (ro*m0/(4*pi))
+%B_dip = Bmr * L * (3*r*dot(rom, r)/mynorm(r)^5 - rom/mynorm(r)^3)
+
+
+bb(1) = int( B1(1)*norm(diff(rm)), l);
+bb(2) = int( B1(2)*norm(diff(rm)), l);
+bb(3) = int( B1(3)*norm(diff(rm)), l);
+
+rm = l.*[0, 1, 0];%Параметрически заданная кривая, описывающая соленоид
+rom = [0, 1, 0]; % Вектор магнитной плотности. Постоянен на всей длинне сленоида
+B2 = Bmr * (3*(r-rm)*dot(rom, (r-rm))/mynorm(r-rm)^5 - rom/mynorm(r-rm)^3);%Bmr = (ro*m0/(4*pi))
+
+bb2(1) = int( B2(1)*norm(diff(rm)), l);
+bb2(2) = int( B2(2)*norm(diff(rm)), l);
+bb2(3) = int( B2(3)*norm(diff(rm)), l);
+
+Bx = subs(bb(1), l, L/2) - subs(bb(1), l, -L/2) + subs(bb2(1), l, L/2) - subs(bb2(1), l, -L/2);
+By = subs(bb(2), l, L/2) - subs(bb(2), l, -L/2) + subs(bb2(2), l, L/2) - subs(bb2(2), l, -L/2);
+Bz = subs(bb(3), l, L/2) - subs(bb(3), l, -L/2) + subs(bb2(3), l, L/2) - subs(bb2(3), l, -L/2);
+
+Bd = [subs(bb(1), l, L/2) - subs(bb(1), l, -L/2), subs(bb2(1), l, L/2) - subs(bb2(1), l, -L/2);...
+     subs(bb(2), l, L/2) - subs(bb(2), l, -L/2), subs(bb2(2), l, L/2) - subs(bb2(2), l, -L/2);...
+     subs(bb(3), l, L/2) - subs(bb(3), l, -L/2), subs(bb2(3), l, L/2) - subs(bb2(3), l, -L/2)];
+BB(:,1) = Bd(:,2);
+BB(:,2) = Bd(:,1);
+Bd = BB
+]]></w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Рассчёты</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>    1. Нахождение a,b параметров</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[%{
+R = ...
+   [cos(gam),   -sin(gam),  0;...
+    sin(gam),   cos(gam),   0;...
+    0,          0,          1]*...
+   [cos(bet),   0,          sin(bet);...
+    0,          1,          0;...
+    -sin(bet),  0,          cos(bet);]*...
+   [1,          0,          0;...
+    0,          cos(alf),   -sin(alf);...
+    0,          sin(alf),   cos(alf);]
+%Кусочек нужный для фаз маяка, используя модель магнитных линий
+%syms w t real
+%simplify(R*[cos(w*t)+sin(w*t);cos(w*t)+sin(w*t);cos(w*t)+sin(w*t)])
+%}
+r = norm([x,y,z])
+u = x/r;
+v = y/r;
+w = z/r;
+B = (Bmr*l/r^3).*...
+   [3*u*v,      3*u^2-1;...
+    3*v^2-1,    3*u*v;...
+    3*v*w,      3*u*w]]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[%{
+alf = sym('alf', {'real'})
+bet = sym('bet', {'real'})
+gam = sym('gam', {'real'})
+ 
+R = ...
+   [cos(gam),   -sin(gam),  0;...
+    sin(gam),   cos(gam),   0;...
+    0,          0,          1]*...
+   [cos(bet),   0,          sin(bet);...
+    0,          1,          0;...
+    -sin(bet),  0,          cos(bet);]*...
+   [1,          0,          0;...
+    0,          cos(alf),   -sin(alf);...
+    0,          sin(alf),   cos(alf);]
+%}
+V_sol = R*Bd;
+B
+Bd
+simplify(B-Bd)
+
+GenVS = matlabFunction(V_sol);%Bmr = (ro*m0/(4*pi))]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[%Получение функций
+fn_Bx = matlabFunction(Bx);
+fn_By = matlabFunction(By);
+fn_Bz = matlabFunction(Bz);
+
+]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[
+dip = MagneticMoment(0, 0, 0, 1, 1, 0)
+N = 100;
+x = linspace(-4, 4, N);
+y = linspace(-4, 4, N);
+z = linspace(-4, 4, N);
+bx = zeros(N, N, N);
+by = zeros(N, N, N);
+bz = zeros(N, N, N);
+bx3 = zeros(N, N, N);
+by3 = zeros(N, N, N);
+bz3 = zeros(N, N, N);
+for i = 1:numel(x)
+    for j = 1:numel(y)
+        for k = 1:numel(z)
+            [bx(i, j, k), by(i, j, k), bz(i, j, k)] = dip.Field(x(i), y(j), z(k));
+            
+            bx3(i, j, k) = fn_Bx(m/L, x(i), y(j), z(k));
+            by3(i, j, k) = fn_By(m/L, x(i), y(j), z(k));
+            bz3(i, j, k) = fn_Bz(m/L, x(i), y(j), z(k));
+        end
+    end
+end
+]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[
+figure;
+[X, Y] = meshgrid(x, y);
+%quiver(X(1:n:end), Y(1:n:end), bx(1:n:end)./nrm(1:n:end), -by(1:n:end)./nrm(1:n:end))
+
+%strmsl1 = streamslice(X, Y, -bx(:, :, 50), by(:, :, 50));
+hold on
+
+strmsl3 = streamslice(X, Y, -bx3(:, :, 50), by3(:, :, 50));
+for i = 1:numel(strmsl3)
+    strmsl3(i).Color = [1,0,0];
+end
+
+]]></w:t></w:r></w:p></w:body></w:document>

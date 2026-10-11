@@ -1,0 +1,6 @@
+x = 1
+y = 1
+z = 1
+alf = linespace( deg2rad(-90), deg2rad(90), 100)
+gam = deg2rad(50)
+bet = deg2rad(50)

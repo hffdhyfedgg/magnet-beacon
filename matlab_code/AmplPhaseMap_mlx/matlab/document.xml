@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[n = 100;
+numOfLine = 100;
+place = "xy";
+[x,y] = meshgrid(linspace(0,10,n),linspace(-5,5,n));
+alf = deg2rad(21);
+bet = deg2rad(-27);
+gam = deg2rad(34);
+%z = linespace(-5,5,n);
+x0 = 1.24;
+y0 = 1.03;
+z0 = 3.11;
+B = 5.5e-8;
+ 
+load GenV.mat]]></w:t></w:r><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="R2018a"><w:customXml w:element="livecontrol"><w:customXmlPr><w:attr w:name="context" w:val="{&quot;type&quot;:&quot;slider&quot;,&quot;data&quot;:{&quot;text&quot;:&quot;numOfLine&quot;,&quot;minimum&quot;:1,&quot;maximum&quot;:100,&quot;value&quot;:100,&quot;step&quot;:1,&quot;executionOn&quot;:&quot;ValueChanging&quot;,&quot;executionModel&quot;:&quot;Nothing&quot;}}"/><w:attr w:name="text" w:val="100"/><w:attr w:name="startOffsetLine" w:val="1"/><w:attr w:name="startColumn" w:val="12"/><w:attr w:name="endOffsetLine" w:val="1"/><w:attr w:name="endColumn" w:val="15"/></w:customXmlPr></w:customXml></mc:Choice><mc:Fallback/></mc:AlternateContent><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="R2018a"><w:customXml w:element="livecontrol"><w:customXmlPr><w:attr w:name="context" w:val="{&quot;type&quot;:&quot;comboBox&quot;,&quot;data&quot;:{&quot;text&quot;:&quot;Плоскость&quot;,&quot;items&quot;:[{&quot;label&quot;:&quot;\&quot;xy\&quot;&quot;,&quot;value&quot;:&quot;\&quot;xy\&quot;&quot;},{&quot;label&quot;:&quot;\&quot;xz\&quot;&quot;,&quot;value&quot;:&quot;\&quot;xz\&quot;&quot;},{&quot;label&quot;:&quot;\&quot;yz\&quot;&quot;,&quot;value&quot;:&quot;\&quot;yz\&quot;&quot;}],&quot;itemLabels&quot;:[&quot;xy&quot;,&quot;xz&quot;,&quot;yz&quot;],&quot;value&quot;:&quot;\&quot;xy\&quot;&quot;,&quot;executionModel&quot;:&quot;Nothing&quot;}}"/><w:attr w:name="text" w:val="&quot;xy&quot;"/><w:attr w:name="startOffsetLine" w:val="2"/><w:attr w:name="startColumn" w:val="8"/><w:attr w:name="endOffsetLine" w:val="2"/><w:attr w:name="endColumn" w:val="12"/></w:customXmlPr></w:customXml></mc:Choice><mc:Fallback/></mc:AlternateContent><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="R2018a"><w:customXml w:element="livecontrol"><w:customXmlPr><w:attr w:name="context" w:val="{&quot;type&quot;:&quot;slider&quot;,&quot;data&quot;:{&quot;text&quot;:&quot;Альфа&quot;,&quot;minimum&quot;:-90,&quot;maximum&quot;:90,&quot;value&quot;:21,&quot;step&quot;:1,&quot;executionOn&quot;:&quot;ValueChanging&quot;,&quot;executionModel&quot;:&quot;Nothing&quot;}}"/><w:attr w:name="text" w:val="21"/><w:attr w:name="startOffsetLine" w:val="4"/><w:attr w:name="startColumn" w:val="14"/><w:attr w:name="endOffsetLine" w:val="4"/><w:attr w:name="endColumn" w:val="16"/></w:customXmlPr></w:customXml></mc:Choice><mc:Fallback/></mc:AlternateContent><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="R2018a"><w:customXml w:element="livecontrol"><w:customXmlPr><w:attr w:name="context" w:val="{&quot;type&quot;:&quot;slider&quot;,&quot;data&quot;:{&quot;text&quot;:&quot;Бетта&quot;,&quot;minimum&quot;:-90,&quot;maximum&quot;:90,&quot;value&quot;:-27,&quot;step&quot;:1,&quot;executionOn&quot;:&quot;ValueChanging&quot;,&quot;executionModel&quot;:&quot;Nothing&quot;}}"/><w:attr w:name="text" w:val="-27"/><w:attr w:name="startOffsetLine" w:val="5"/><w:attr w:name="startColumn" w:val="14"/><w:attr w:name="endOffsetLine" w:val="5"/><w:attr w:name="endColumn" w:val="17"/></w:customXmlPr></w:customXml></mc:Choice><mc:Fallback/></mc:AlternateContent><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="R2018a"><w:customXml w:element="livecontrol"><w:customXmlPr><w:attr w:name="context" w:val="{&quot;type&quot;:&quot;slider&quot;,&quot;data&quot;:{&quot;text&quot;:&quot;Гамма&quot;,&quot;minimum&quot;:-90,&quot;maximum&quot;:90,&quot;value&quot;:34,&quot;step&quot;:1,&quot;executionOn&quot;:&quot;ValueChanging&quot;,&quot;executionModel&quot;:&quot;Nothing&quot;}}"/><w:attr w:name="text" w:val="34"/><w:attr w:name="startOffsetLine" w:val="6"/><w:attr w:name="startColumn" w:val="14"/><w:attr w:name="endOffsetLine" w:val="6"/><w:attr w:name="endColumn" w:val="16"/></w:customXmlPr></w:customXml></mc:Choice><mc:Fallback/></mc:AlternateContent><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="R2018a"><w:customXml w:element="livecontrol"><w:customXmlPr><w:attr w:name="context" w:val="{&quot;type&quot;:&quot;slider&quot;,&quot;data&quot;:{&quot;text&quot;:&quot;x0 [м]&quot;,&quot;minimum&quot;:-5,&quot;maximum&quot;:5,&quot;value&quot;:1.24,&quot;step&quot;:0.01,&quot;executionOn&quot;:&quot;ValueChanging&quot;,&quot;executionModel&quot;:&quot;Nothing&quot;}}"/><w:attr w:name="text" w:val="1.24"/><w:attr w:name="startOffsetLine" w:val="8"/><w:attr w:name="startColumn" w:val="5"/><w:attr w:name="endOffsetLine" w:val="8"/><w:attr w:name="endColumn" w:val="9"/></w:customXmlPr></w:customXml></mc:Choice><mc:Fallback/></mc:AlternateContent><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="R2018a"><w:customXml w:element="livecontrol"><w:customXmlPr><w:attr w:name="context" w:val="{&quot;type&quot;:&quot;slider&quot;,&quot;data&quot;:{&quot;text&quot;:&quot;y0 [м]&quot;,&quot;minimum&quot;:-5,&quot;maximum&quot;:5,&quot;value&quot;:1.03,&quot;step&quot;:0.01,&quot;executionOn&quot;:&quot;ValueChanging&quot;,&quot;executionModel&quot;:&quot;Nothing&quot;}}"/><w:attr w:name="text" w:val="1.03"/><w:attr w:name="startOffsetLine" w:val="9"/><w:attr w:name="startColumn" w:val="5"/><w:attr w:name="endOffsetLine" w:val="9"/><w:attr w:name="endColumn" w:val="9"/></w:customXmlPr></w:customXml></mc:Choice><mc:Fallback/></mc:AlternateContent><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="R2018a"><w:customXml w:element="livecontrol"><w:customXmlPr><w:attr w:name="context" w:val="{&quot;type&quot;:&quot;slider&quot;,&quot;data&quot;:{&quot;text&quot;:&quot;z0 [м]&quot;,&quot;minimum&quot;:-5,&quot;maximum&quot;:5,&quot;value&quot;:3.11,&quot;step&quot;:0.01,&quot;executionOn&quot;:&quot;ValueChanging&quot;,&quot;executionModel&quot;:&quot;Nothing&quot;}}"/><w:attr w:name="text" w:val="3.11"/><w:attr w:name="startOffsetLine" w:val="10"/><w:attr w:name="startColumn" w:val="5"/><w:attr w:name="endOffsetLine" w:val="10"/><w:attr w:name="endColumn" w:val="9"/></w:customXmlPr></w:customXml></mc:Choice><mc:Fallback/></mc:AlternateContent><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="R2018a"><w:customXml w:element="livecontrol"><w:customXmlPr><w:attr w:name="context" w:val="{&quot;type&quot;:&quot;slider&quot;,&quot;data&quot;:{&quot;text&quot;:&quot;B [Тл]&quot;,&quot;minimum&quot;:1e-10,&quot;maximum&quot;:1e-7,&quot;value&quot;:5.5e-8,&quot;step&quot;:1e-9,&quot;executionOn&quot;:&quot;ValueChanging&quot;,&quot;executionModel&quot;:&quot;Nothing&quot;}}"/><w:attr w:name="text" w:val="5.5e-8"/><w:attr w:name="startOffsetLine" w:val="11"/><w:attr w:name="startColumn" w:val="4"/><w:attr w:name="endOffsetLine" w:val="11"/><w:attr w:name="endColumn" w:val="10"/></w:customXmlPr></w:customXml></mc:Choice><mc:Fallback/></mc:AlternateContent><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="R2019a"><w:customXml w:element="livecontrol"><w:customXmlPr><w:attr w:name="context" w:val="{&quot;type&quot;:&quot;button&quot;,&quot;data&quot;:{&quot;text&quot;:&quot;Run&quot;,&quot;value&quot;:&quot; &quot;,&quot;executionModel&quot;:&quot;AllSections&quot;}}"/><w:attr w:name="text" w:val=" "/><w:attr w:name="startOffsetLine" w:val="12"/><w:attr w:name="startColumn" w:val="0"/><w:attr w:name="endOffsetLine" w:val="12"/><w:attr w:name="endColumn" w:val="1"/></w:customXmlPr></w:customXml></mc:Choice><mc:Fallback/></mc:AlternateContent></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[
+Ampl = @(a, b) sqrt(a.^2 + b.^2);
+Ph = @(a, b) atan(b./a);
+ax = zeros(size(x));
+ay = zeros(size(x));
+az = zeros(size(x));
+bx = zeros(size(x));
+by = zeros(size(x));
+bz = zeros(size(x));
+
+
+
+for i = 1:numel(x)
+    
+    if place == "xy"
+        e1 = x0+x(i);
+        e2 = y0+y(i);
+        e3 = z0;
+    elseif place == "xz"
+        e1 = x0+x(i);
+        e2 = y0;
+        e3 = z0+y(i);
+    else
+        e1 = x0;
+        e2 = y0+x(i);
+        e3 = z0+y(i);
+    end
+    
+    v = GenV(B, alf, bet, gam, e1, e2, e3);
+    ax(i) = v(1,1);
+    bx(i) = v(1,2);
+    ay(i) = v(2,1);
+    by(i) = v(2,2);
+    az(i) = v(3,1);
+    bz(i) = v(3,2);
+end
+
+amplx = Ampl(ax, bx);
+phx = Ph(ax, bx);
+amply = Ampl(ay, by);
+phy = Ph(ay, by);
+amplz = Ampl(az, bz);
+phz = Ph(az, bz);]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[fg123 = figure;
+xlabel("м"); ylabel("м"); title("Эквипотенциали ax и bx");
+[c,z0] = contour(x, y, ax, numOfLine, "LineColor","red");
+clabel(c,z0, "fontSize", 7)
+hold on;
+[c,z0] = contour(x,y,bx, numOfLine, "LineColor","blue");
+clabel(c,z0, "fontSize", 7)
+
+fg7 = figure;
+surface(x+x0,y+y0,amplx); xlabel("м"); ylabel("м"); title("Амплитуда по x");
+
+subplot(1,2,1,gca)
+subplot(1,2,2)
+%fg8 = figure;
+surface(x+x0,y+y0,phx); xlabel("м"); ylabel("м"); title("Фза по x");
+fg71 = figure;
+contour(x+x0,y+y0,amplx,numOfLine); xlabel("м"); ylabel("м"); title("Эквипотенциали амплитуды по x");
+fg81 = figure;
+contour(x+x0,y+y0,phx, numOfLine); xlabel("м"); ylabel("м"); title("Эквипотенциали фазы по x");
+
+fg782 = figure; xlabel("м"); ylabel("м"); title("Эквипотенциали амплитуды и фазы по x");
+[c, z0] = contour(x+x0,y+y0,amplx, 40, "LineColor", "red"); xlabel("м"); ylabel("м"); title("Эквипотенциали амплитуды по x");
+clabel(c,z0, "fontSize", 7)
+hold on
+[c, z0] = contour(x+x0,y+y0,phx, 40, "LineColor", "blue");
+clabel(c,z0, "fontSize", 7)
+
+
+fg9 = figure;
+surface(x+x0,y+y0,amply); xlabel("м"); ylabel("м"); title("Амплитуда по y");
+fg10 = figure;
+surface(x+x0,y+y0,phy); xlabel("м"); ylabel("м"); title("Фаза по y");
+fg11 = figure;
+surface(x+x0,y+y0,amplz); xlabel("м"); ylabel("м"); title("Амплитуда по z");
+fg12 = figure;
+surface(x+x0,y+y0,phz); xlabel("м"); ylabel("м"); title("Фаза по z");
+
+
+fg1 = figure;
+surface(x+x0,y+y0,ax); xlabel("м"); ylabel("м"); title("ax");
+fg2 = figure;
+surface(x+x0,y+y0,bx); xlabel("м"); ylabel("м"); title("bx");
+
+fg11 = figure;
+contour(x+x0,y+y0,ax, numOfLine); xlabel("м"); ylabel("м"); title("Эквипотенциали ax");
+fg22 = figure;
+contour(x+x0,y+y0,bx, numOfLine); xlabel("м"); ylabel("м"); title("Эквипотенциали bx");
+
+
+
+fg3 = figure;
+surface(x+x0,y+y0,ay); xlabel("м"); ylabel("м"); title("ay");
+fg4 = figure;
+surface(x+x0,y+y0,by); xlabel("м"); ylabel("м"); title("by");
+fg5 = figure;
+surface(x+x0,y+y0,az); xlabel("м"); ylabel("м"); title("az");
+fg6 = figure;
+surface(x+x0,y+y0,bz); xlabel("м"); ylabel("м"); title("bz");
+
+]]></w:t></w:r></w:p></w:body></w:document>

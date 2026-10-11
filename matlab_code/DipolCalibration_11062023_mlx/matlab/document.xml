@@ -1,0 +1,581 @@
+<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="heading"/><w:jc w:val="left"/></w:pPr><w:r><w:t>1. Вывод формул расчёта магнитного момента</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Плотность магнитного момента:</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>\vec{ \rho_m} = \frac{\vec{m}N}{L}</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Элемент магнитной индукции создаваемый элементом соленоида</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>d\vec{B}(\vec{r})=\frac{\mu_0}{4\pi}\frac{3(\vec{r}-\vec{r_m})(\vec{\rho_m},(\vec{r}-\vec{r_m}))-\vec{\rho_m}||(\vec{r}-\vec{r_m})||^2}{||(\vec{r}-\vec{r_m})||^5}dL</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[clear
+
+mynorm = @(r) (sqrt(sum(r.^2)))
+
+import = false;%Контролирует перерасчёт формул 
+
+
+
+L = 137e-3;%Длинна катушки примерно 137мм
+L0 = -L/2;
+
+if ~import
+    syms m0 l real positive
+    syms x y z real positive
+    r = [x,y,z]; % Радиус-вектор до точки
+    ro = sym('ro', 'real'); %Плотность магнитного момента
+    rm = [l,0,0]; %Радиус-вектор до элементарного элменета катушки
+    %B = [Bx, By, Bz];
+    assumptions
+    
+    vec_ro = [ro,0,0]
+    dB = (m0/(4*pi)) * (3*(r-rm)*dot(vec_ro,(r-rm))/mynorm(r-rm)^5-vec_ro/mynorm(r-rm)^3)
+    dipolB_vec = (m0/(4*pi)) * (3*r*dot(vec_ro*L*numel(L0), r)/mynorm(r)^5 - (vec_ro*L*numel(L0))/mynorm(r)^3)
+    
+    syms bx by bz b real
+    
+    %Интегрирование Bx
+    fn= 1/((l-x)^2+(y)^2+(z)^2)^sym(3/2)
+    half_Bx1(l) = int(fn,l)
+    fn = (l-x)*(l-x)/(mynorm([l-x,y,z]))^5
+    half_Bx2(l) = 3*int(fn,l)
+    Bxx = repelem(sym('0'), numel(L0));
+    for i = 1:numel(L0)
+       Bxx(i) = (m0*ro/(4*pi))*((half_Bx2(L0(i)+L)-half_Bx2(L0(i)))-(half_Bx1(L0(i)+L)-half_Bx1(L0(i))));
+    end
+    Bx = sum(Bxx)
+    fn_Bx = matlabFunction(subs(simplify(Bx),m0,4e-7*pi));
+    fn_rox = matlabFunction(subs(simplify(solve(bx == Bx, ro)),m0,4e-7*pi));
+    
+    %Интегрирование By
+    Byy = repelem(sym('0'), numel(L0));
+    for i = 1:numel(L0)
+       Byy(i) = simplify(subs(int(dB(2),l),l,L0(i)+L) - subs(int(dB(2),l),l,L0(i)));
+    end
+    By = sum(Byy)
+    fn_By = matlabFunction(subs(simplify(By),m0,4e-7*pi));
+    fn_roy = matlabFunction(subs(simplify(solve(by == By, ro)),m0,4e-7*pi));
+    
+    %Интегрирование Bz
+    Bzz = repelem(sym('0'), numel(L0));
+    for i = 1:numel(L0)
+       Bzz(i) = simplify(subs(int(dB(3),l),l,L0(i)+L) - subs(int(dB(3),l),l,L0(i)));
+    end
+    Bz = sum(Bzz)
+    fn_Bz = matlabFunction(subs(simplify(Bz),m0,4e-7*pi));
+    %fn_roz = matlabFunction(subs(simplify(solve(bz == Bz, ro)),m0,4e-7*pi));
+
+    %Модуль вектора B соленоида
+    B = mynorm([Bx,By,Bz]);
+    %Модуль вектора B магнитного момента
+    dipolB = mynorm(dipolB_vec);
+    
+    %Относительная погрешность разности моделей
+    delt_models = abs((dipolB-B)/B)*100
+    RelativeError = sym('delta', {'real', 'positive'})
+    %sl = solve(delt_models == RelativeError, r);
+    
+    fn_B = matlabFunction(subs(B,m0,4e-7*pi));
+    %sl = solve(b == subs(B,m0,4e-7*pi), ro);
+    
+    %fn_ro = matlabFunction(simplify(sl(1)));
+    %save D:\Bezmen\PavelSheptuhin\fn_ro
+    
+    %fn_ro = matlabFunction(sl(1));
+    clear bx by bz b sl
+    %dot - скалярное произведение векторов
+end
+    
+]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Экспериментальные данные</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[
+%{
+Многог измерений
+r = ...
+    [0:1e-2:21e-2;...x
+     repelem(64e-3+7.5e-3,22);...y
+     repelem(-2.95e-3,22)];%z
+ Bin = 
+%}
+
+%{
+r_in = ...
+    [[0:1e-2:21e-2]+5e-3;...x поправка изнчально - -20e-3
+     repelem(64e-3+7.5e-3,22);...y
+     repelem(-2.95e-3,22)];%z
+bx = 1e-6.*([18.7, 26.6, 34.3, 41.1, 46.3, 49.8, 51.5, 51.4, 49.5, 45.8, 40.6, 34, 26.2, 17.7, 9.2, 1.5, -6.2, -12.7, -17.7, -21.1, -23.2, -24.1]+5);
+by = 1e-6.*([61.3, 61, 58.9, 56.6, 50.4, 44.1, 36.2, 28.1, 19.3, 10.9, 2.2, -5.4, -2.5, -18.4, -22.9, -25.8, -27.3, -27.2, -25.9, -23.3, -20.1, -16.2]-15.7);
+bz = 1e-6.*([-32.2, -32.5, -32.9, -33.1, -36.0, -37.4, -39.4, -41.6, -43.6, -45.7, -48.2, -50, -52, -53.3, -54.5, -55.1, -55, -55, -54.2, -53.3, -52.5, -51.5]+42.5);
+bz = -1.*bz;%В какую сторону направлен bz?
+%}
+load D:\Bezmen\PavelSheptuhin\bx_long.mat
+load D:\Bezmen\PavelSheptuhin\r_in_long.mat
+if import
+    load D:\Bezmen\PavelSheptuhin\All_fnB_fnro.mat   
+    load D:\Bezmen\PavelSheptuhin\fn_ro.mat  
+end
+
+
+r_in = r_in_long(:,1:51);
+r_in(2,:) = r_in(2,:)-0.1;
+
+bx = bx_long{1:51,:}';
+by = zeros(size(bx));
+bz = zeros(size(bx));]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Составляющие B по отдельным компонентам (bx,by,bz)</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[
+disp("Составляющие B по отдельным компонентам (bx,by,bz)");
+num_ro = fn_rox(bx, r_in(1,:), r_in(2,:), r_in(3,:));
+RO = mean(num_ro(1,:))
+%{
+fg_alsobx = figure("Name", "also_Bx");
+plot(r_in(2,:), bx);
+grid on; grid minor;
+hold on
+Y = 0:1e-2:100e-2;
+X = zeros(size(Y));
+Z = zeros(size(Y));
+N = size(X,2);
+bx_aprox = fn_Bx(repelem(RO,N),X,Y,Z);
+plot(Y,bx_aprox,"--");
+%clear N X
+legend("B_x","fn_{Bx}")
+hold off
+%}
+%{
+num_ro = fn_roy(by,r_in(1,:),r_in(2,:),r_in(3,:));
+RO = mean(num_ro(1,:))
+
+fg_alsoby = figure("Name","also_By");
+plot(r_in(1,:),by);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+by_aprox = fn_By(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,by_aprox,"--");
+%clear N X
+legend("B_y","fn_{By}")
+hold off
+
+
+num_ro = fn_roz(bz,r_in(1,:),r_in(2,:),r_in(3,:));
+RO = mean(num_ro(1,:))
+
+fg_alsobz = figure("Name","also_Bz");
+plot(r_in(1,:),bz);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+bz_aprox = fn_Bz(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bz_aprox,"--");
+legend("B_z","fn_{Bz}")
+hold off
+%--
+%}]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[if import
+    load D:\Bezmen\PavelSheptuhin\num_ro.mat
+else
+    %b = mynorm([bx;by;bz]);
+    %num_ro = fn_ro(b,r_in(1,:),r_in(2,:),r_in(3,:));%Почему то выдаёт2 решения
+    %clear b
+end
+
+
+%delta_ro = abs(tinv(0.95, size(num_ro(1,:),2))*std(num_ro(1,:))/sqrt(size(num_ro(1,:),2)))
+%RO = 700*pi*(23e-3/2)^2*0.5/L;%mean(num_ro(1,:));
+%{
+disp("RO = "+num2str(RO)+"+-"+num2str(delta_ro));
+disp("Относительная погрешность: "+num2str(100*delta_ro/RO)+"%")
+disp("Магнитный момент");
+disp("M = Ro*L ="+num2str(RO*L)+"+-"+num2str(delta_ro*L));
+%}]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[if false
+    disp("Рассчёт ближней границы")
+    xdata = linspace(0.1,1.5,100);
+    ydata = linspace(0.1,1.5,100);
+    zdata = linspace(0.1,0.1,100);
+    r = sqrt(sum([xdata;ydata;zdata].^2));
+    beacon = MagneticMoment(0,0,0,RO*L,0,0);
+    [var1, var2, var3] = beacon.Field(xdata, ydata, zdata);
+    %x состовляющая
+    err = 100*abs(var1 - fn_Bx(repmat(RO, size(xdata)), xdata, ydata, zdata))./ fn_Bx(repmat(RO, size(xdata)), xdata, ydata, zdata);
+    figure;
+    plot(r, err);
+    xlabel("[м]"); ylabel("[%]");
+    grid on;
+    
+    figure;
+    plot(r, var1, r, fn_Bx(repmat(RO, size(xdata)), xdata, ydata, zdata));
+    xlabel("[м]"); ylabel("[]");
+    grid on;
+    %y состовляющая
+    err = 100*abs(var2 - fn_By(repmat(RO, size(xdata)), xdata, ydata, zdata))./ fn_By(repmat(RO, size(xdata)), xdata, ydata, zdata);
+    figure;
+    plot(r, err);
+    xlabel("[м]"); ylabel("[%]");
+    grid on;
+    
+    figure;
+    plot(r, var2, r, fn_By(repmat(RO, size(xdata)), xdata, ydata, zdata));
+    xlabel("[м]"); ylabel("[Тл]");
+    grid on;
+    %z состовляющая
+    err = 100*abs(var3 - fn_Bz(repmat(RO, size(xdata)), xdata, ydata, zdata))./ fn_Bz(repmat(RO, size(xdata)), xdata, ydata, zdata);
+    figure;
+    plot(r, err);
+    xlabel("[м]"); ylabel("[%]");
+    grid on;
+    
+    figure;
+    plot(r, var3, r, fn_Bz(repmat(RO, size(xdata)), xdata, ydata, zdata));
+    xlabel("[м]"); ylabel("[]");
+    grid on;
+    
+    %Модуль
+    disp("Модуль")
+    figure;
+    plot(r, mynorm([var1; var2; var3]), r, fn_B(repmat(RO, size(xdata)), xdata, ydata, zdata))
+    xlabel("[м]"); ylabel("[Тл]");
+    grid on;
+    
+    figure;
+    plot(r, abs((mynorm([var1; var2; var3])-fn_B(repmat(RO, size(xdata)), xdata, ydata, zdata))./fn_B(repmat(RO, size(xdata)), xdata, ydata, zdata))*100)
+    xlabel("[м]"); ylabel("[%]");
+    grid on;
+    %clear xdata ydata zdata r
+end]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Рассчитаем </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId1"/></w:customXmlPr><w:r><w:t>B_T =\frac{\mu_0 \rho_m L}{4\pi \;}</w:t></w:r></w:customXml><w:r><w:t> - магнитную константу определеяющую поле при упрощении катушки до диполя. (возможно формула не верная и там не должно быть магнитной константы)</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[%Bt = 1e-7* 0.240148840227548;%4e-7*pi*RO*L/(4*pi) = 1e-7*RO*L
+%Практические данные полученны для одной катушки!
+Bt = RO*L*numel(L0);
+%Объявим функции
+
+Y = 1e-2:1e-2:101e-2;
+X = repmat(0.005, size(Y));
+Z = repmat(0.005, size(X));
+
+beacon = MagneticMoment(0, 0, 0, RO*L, 0, 0);
+[bf_x, bf_y, bf_z] = beacon.Field(X, Y, Z);
+
+fg1 = figure("Name","By");
+title("By при использовании всех данных");
+semilogy(r_in(2,:), bx);
+grid on; grid minor;
+hold on
+
+N = size(X,2);
+bx_aprox = fn_Bx(repelem(RO,N), X, Y, Z);
+by_aprox = fn_By(repelem(RO,N), X, Y, Z);
+bz_aprox = fn_Bz(repelem(RO,N), X, Y, Z);
+
+semilogy(Y, bx_aprox,"--black");%апроксимация идеальным соленоидом
+semilogy(Y(3:end)+1e-2, bf_x(3:end), "xred")%апроксимация диполем
+ xlabel("y [м]"); ylabel("B_x [Тл]");
+%Границы погрешности fn_B...
+%bx_aprox_pos_delta = fn_Bx(repelem(RO+delta_ro,N),X,Y,Z);
+%bx_aprox_neg_delta = fn_Bx(repelem(RO-delta_ro,N),X,Y,Z);
+%semilogy(Y,bx_aprox_pos_delta,":black");
+%semilogy(Y,bx_aprox_neg_delta,":black");
+legend("B_x","B_{x,с}","B_{x,д}");
+%axis([-0.3 0.3 -2e-5 6e-5]);
+hold off
+
+%Построим графики погрешностей поперёк катушки для всех состовляющих поля
+disp("Вдоль Oy поперёк катушки")
+figure("Name", "Y_ModelsErr_x");
+disp("x состовляющая поля")
+semilogy(Y(3:end), 100*abs( (bx_aprox(3:end) - bf_x(3:end))./bx_aprox(3:end) ),"black");
+xlabel("y [м]"); ylabel("|\delta|B_x [%]");
+grid on; 
+
+figure("Name", "Y_ModelsErr_y");
+disp("y состовляющая поля")
+semilogy(Y(3:end), 100*abs( (by_aprox(3:end) - bf_y(3:end))./by_aprox(3:end) ),"black");
+xlabel("y [м]"); ylabel("|\delta|B_y [%]");
+grid on; 
+
+figure("Name", "Y_ModelsErr_z");
+disp("z состовляющая поля")
+semilogy(Y(3:end), 100*abs( (bz_aprox(3:end) - bf_z(3:end))./bz_aprox(3:end) ),"black");
+xlabel("y [м]"); ylabel("|\delta|B_z [%]");
+grid on; 
+
+%Построим график погрешностей вдоль оси катушки для всех состовляющих поля
+figure("Name", "ModelsErr_x");
+disp("Вдоль x")
+X = (L0 + 1.1*L):1e-2:8*L;
+Y = repmat(0.005, size(X));
+Z = repmat(0.005, size(X));
+[bf_x, bf_y, bf_z] = beacon.Field(X, Y, Z);
+N = size(X,2);
+bx_aprox = fn_Bx(repelem(RO,N), X, Y, Z);
+by_aprox = fn_By(repelem(RO,N), X, Y, Z);
+bz_aprox = fn_Bz(repelem(RO,N), X, Y, Z);
+
+figure("Name", "X_ModelsErr_x");
+disp("x состовляющая поля")
+semilogy(X(3:end), 100*abs( (bx_aprox(3:end) - bf_x(3:end))./bx_aprox(3:end) ),"black");
+xlabel("x [м]"); ylabel("|\delta|B_x [%]");
+grid on; 
+
+figure("Name", "X_ModelsErr_y");
+disp("y состовляющая поля")
+semilogy(X(3:end), 100*abs( (by_aprox(3:end) - bf_y(3:end))./by_aprox(3:end) ),"black");
+xlabel("x [м]"); ylabel("|\delta|B_y [%]");
+grid on; 
+
+figure("Name", "X_ModelsErr_z");
+disp("z состовляющая поля")
+semilogy(X(3:end), 100*abs( (bz_aprox(3:end) - bf_z(3:end))./bz_aprox(3:end) ),"black");
+xlabel("x [м]"); ylabel("|\delta|B_z [%]");
+grid on; ]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[
+fg12 = figure("Name","AbsErrBx");
+%hold on; xlabel("y [м]"); ylabel("\Delta [Тл]");
+ax = axes("Parent",fg12);
+%grid on; grid minor;
+plot(ax, r_in(2,:), abs(fn_Bx(repelem(RO,size(r_in(1,:),2)),r_in(1,:),r_in(2,:),r_in(3,:))-bx), "red",...
+    r_in(2,:), abs(var1-bx), "blue")
+ax.YScale = 'log';
+ax.XLabel.String = "y [м]";
+%ax.YLabel.String = "\Delta [Тл]";
+ax.XGrid = 'on';ax.XMinorGrid = 'on';
+ax.YGrid = 'on';ax.YMinorGrid = 'on';
+ax.XTick = 0:0.1:1;
+ax.YTick = logspace(log10(min([abs(fn_Bx(repelem(RO,size(r_in(1,:),2)),r_in(1,:),r_in(2,:),r_in(3,:))-bx), abs(var1-bx)])), log10(max([abs(fn_Bx(repelem(RO,size(r_in(1,:),2)),r_in(1,:),r_in(2,:),r_in(3,:))-bx), abs(var1-bx)])), 10);
+ax.XTickLabel = string(0:0.1:1);
+ax.YTickLabel = string(round(logspace(log10(min([abs(fn_Bx(repelem(RO,size(r_in(1,:),2)),r_in(1,:),r_in(2,:),r_in(3,:))-bx), abs(var1-bx)])), log10(max([abs(fn_Bx(repelem(RO,size(r_in(1,:),2)),r_in(1,:),r_in(2,:),r_in(3,:))-bx), abs(var1-bx)])), 10),2,"significant"));
+legend("|\Delta| fn_{Bx}","|\Delta| fnd_{Bx}");
+
+
+fg2 = figure("Name","By");
+title("By при использовании всех данных"); xlabel("x [м]"); ylabel("B_y [Тл]");
+plot(r_in(2,:),by);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+by_aprox = fn_By(repelem(RO, N), X, Y, Z);
+plot(Y,by_aprox,"--");
+plot(Y, fn_dipolBy(repelem(Bt,N), X, Y, Z), "xred")%апроксимация диполем
+%Границы погрешности fn_B...
+by_aprox_pos_delta = fn_By(repelem(RO+delta_ro,N),X,Y,Z);
+by_aprox_neg_delta = fn_By(repelem(RO-delta_ro,N),X,Y,Z);
+plot(Y,by_aprox_pos_delta,":black");
+plot(Y,by_aprox_neg_delta,":black");
+%clear N X
+
+legend("B_y","fn_{By}","fnd_{By}")
+%axis([-0.3 0.3 -8e-5 8e-5]);
+hold off
+
+fg3 = figure("Name","Bz");
+title("Bz при использовании всех данных"); xlabel("x [м]"); ylabel("B_z [Тл]");
+plot(r_in(2,:),bz);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+bz_aprox = fn_Bz(repelem(RO, N), X,Y,Z);
+plot(Y,bz_aprox,"--");
+plot(Y, fn_dipolBz(repelem(Bt,N),X,Y,Z), "xred")%апроксимация диполем
+%Границы погрешности fn_B...
+bz_aprox_pos_delta = fn_Bz(repelem(RO+delta_ro,N),X,Y,Z);
+bz_aprox_neg_delta = fn_Bz(repelem(RO-delta_ro,N),X,Y,Z);
+plot(Y,bz_aprox_pos_delta,":black");
+plot(Y,bz_aprox_neg_delta,":black");
+
+legend("B_z","fn_{Bz}","fnd_{Bz}")
+%axis([-0.3 0.3 -1.5e-5 1.5e-5]);
+hold off
+
+fg5= figure("Name", "B");
+title("|B| при использовании всех данных"); xlabel("x [м]"); ylabel("|B| [Тл]");
+plot(r_in(2,:),mynorm([bx;by;bz]));
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+b_aprox = fn_B(repelem(RO,N),X,Y,Z);
+plot(X,b_aprox,"--");
+plot(Y, fn_dipolB(repelem(Bt,N),X,Y,Z), "xred")%апроксимация диполем
+%Погрешности
+b_aprox_pos_delta = fn_B(repelem(RO+delta_ro,N),X,Y,Z);
+b_aprox_neg_delta = fn_B(repelem(RO-delta_ro,N),X,Y,Z);
+plot(Y,b_aprox_pos_delta,":black");
+plot(Y,b_aprox_neg_delta,":black");
+legend("B","fn_{B}","fnd_{B}")
+%axis([-0.3 0.3 0 7e-5]);
+hold off
+
+fg51 = figure("Name", "B_map3");
+quiver3(X,Y,Z, bx_aprox, by_aprox, bz_aprox, "Color","black");
+hold on
+xlabel("x [м]"); ylabel("y [м]"); zlabel("z [м]");
+%Положение катушки
+quiver3(r_in(1,:),r_in(2,:),r_in(3,:), bx, by, bz, "Color","blue");
+[Zc,Yc,Xc] = cylinder(20.9e-3/2);
+Zc = Zc.*185e-3;
+surf(Xc,Yc,Zc, "FaceAlpha",0.1,"FaceColor","red")
+
+legend("fn_{B}", "B", "Катушка");
+clear Xc Yc Zc
+hold off
+
+fg52 = figure("Name", "B_map2");
+quiver(X,Y, bx_aprox, by_aprox, "Color","black");
+hold on
+quiver(r_in(1,:),r_in(2,:), bx, by, "Color","blue");
+xlabel("x [м]"); ylabel("y [м]"); %zlabel("z [м]");
+legend("fn_{B}", "B");
+rectangle("Position",[ L0, -20.9e-3/2, L0+L, 20.9e-3])%Положение катушки
+hold off
+
+clear N X
+]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Рассчёты при занулении bz</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[%{
+bz = repelem(0,size(bx,2));
+
+b = mynorm([bx;by;bz]);
+num_ro = fn_ro(b,r_in(1,:),r_in(2,:),r_in(3,:));%Почему то выдаёт2 решения
+delta_ro = abs(tinv(0.95, size(num_ro(1,:),2))*std(num_ro(1,:))/sqrt(size(num_ro(1,:),2)))
+RO = mean(num_ro(1,:));
+disp("RO = "+num2str(RO)+"+-"+num2str(delta_ro));
+disp("Относительная погрешность: "+num2str(100*delta_ro/RO)+"%")
+
+bz0_fg1 = figure("Name","Bx");
+title("Bx при занулении эксп. Bz"); xlabel("x [м]"); ylabel("B_x [Тл]");
+plot(r_in(1,:),bx);
+grid on; grid minor;
+hold on
+X = -29e-2:1e-2:29e-2;
+N = size(X,2);
+bx_aprox = fn_Bx(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bx_aprox,"--");
+bx_aprox_pos_delta = fn_Bx(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+bx_aprox_neg_delta = fn_Bx(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bx_aprox_pos_delta,":black");
+plot(X,bx_aprox_neg_delta,":black");
+%clear N X
+legend("B_x","fn_{Bx}")
+hold off
+
+
+bz0_fg2 = figure("Name","By");
+title("By при занулении эксп. Bz"); xlabel("x [м]"); ylabel("B_y [Тл]");
+plot(r_in(1,:),by);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+by_aprox = fn_By(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,by_aprox,"--");
+by_aprox_pos_delta = fn_By(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+by_aprox_neg_delta = fn_By(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,by_aprox_pos_delta,":black");
+plot(X,by_aprox_neg_delta,":black");
+%clear N X
+legend("B_y","fn_{By}")
+hold off
+
+bz0_fg3 = figure("Name","Bz");
+title("Bz при занулении эксп. Bz"); xlabel("x [м]"); ylabel("B_z [Тл]");
+plot(r_in(1,:),bz);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+bz_aprox = fn_Bz(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bz_aprox,"--");
+bz_aprox_pos_delta = fn_Bz(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+bz_aprox_neg_delta = fn_Bz(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bz_aprox_pos_delta,":black");
+plot(X,bz_aprox_neg_delta,":black");
+legend("B_z","fn_{Bz}")
+hold off
+
+bz0_fg5= figure("Name", "B");
+title("B при занулении эксп. Bz"); xlabel("x [м]"); ylabel("B [Тл]");
+plot(r_in(1,:),mynorm([bx;by;bz]));
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+b_aprox = fn_B(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,b_aprox,"--");
+b_aprox_pos_delta = fn_B(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+b_aprox_neg_delta = fn_B(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,b_aprox_pos_delta,":black");
+plot(X,b_aprox_neg_delta,":black");
+legend("B","fn_{B}")
+hold off
+
+bz0_fg51 = figure("Name", "B_map3");
+quiver3(X,repelem(r_in(2,1),N),repelem(r_in(3,1),N), bx_aprox, by_aprox, bz_aprox, "Color","black");
+hold on
+quiver3(r_in(1,:),r_in(2,:),r_in(3,:), bx, by, bz, "Color","blue");
+xlabel("x [м]"); ylabel("y [м]"); zlabel("z [м]");
+%Положение катушки
+[Xc,Yc,Zc] = cylinder(20.9e-3/2);
+Zc = Zc.*185e-3;
+surf(Xc,Yc,Zc, "FaceAlpha",0.1,"FaceColor","red")
+
+legend("fn_{B}", "B", "Катушка");
+clear Xc Yc cZ
+hold off
+
+bz0_fg52 = figure("Name", "B_map2");
+quiver(X,repelem(r_in(2,1),N), bx_aprox, by_aprox, "Color","black");
+hold on
+quiver(r_in(1,:),r_in(2,:), bx, by, "Color","blue");
+xlabel("x [м]"); ylabel("y [м]"); %zlabel("z [м]");
+legend("fn_{B}", "B");
+rectangle("Position",[0, -20.9e-3/2, 185e-3, 20.9e-3])%Положение катушки
+hold off
+
+clear N X
+
+%}]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="heading"/><w:jc w:val="left"/></w:pPr><w:r><w:t>2.Рассчёт составляющей от ферритового стержня и магнитной постоянной стержня</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Не доделано, не нужно.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Выпишем основные рассчётные формулы.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/></w:customXmlPr><w:r><w:t>\vec{B} = \vec{B_0} + \vec{B'}</w:t></w:r></w:customXml><w:r><w:t>           (1) </w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Где B - магнитная индукция поля в точке, </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId2"/></w:customXmlPr><w:r><w:t>B_0 =\mu_0 H</w:t></w:r></w:customXml><w:r><w:t> - магнитное поле от макроскопических токов, </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId3"/></w:customXmlPr><w:r><w:t>B^{\prime }</w:t></w:r></w:customXml><w:r><w:t> - поле от намагниченных материалов.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Таким образом </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId4"/></w:customXmlPr><w:r><w:t>B_0</w:t></w:r></w:customXml><w:r><w:t> - зависит только от параметров катушки и тока в ней, а </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId3"/></w:customXmlPr><w:r><w:t>B^{\prime }</w:t></w:r></w:customXml><w:r><w:t> - только от сердечника.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/></w:customXmlPr><w:r><w:t>\vec{M} = \frac{d\vec{p_m}}{dV}</w:t></w:r></w:customXml><w:r><w:t>                (2)</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Где М - вектор намагниченности [A/м], </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId5"/></w:customXmlPr><w:r><w:t>dp_m</w:t></w:r></w:customXml><w:r><w:t> - элементарный магнитный момент в элементе объёма dV.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Вектор намагниченности элемента объёма связан с напряжённостью поля в этой точке.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>\vec{M}(\vec r) = \chi_m \vec H (\vec r)</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Где </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId6"/></w:customXmlPr><w:r><w:t>\chi_{m\;} =\mu -1</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Выразим </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId4"/></w:customXmlPr><w:r><w:t>B_0</w:t></w:r></w:customXml><w:r><w:t> и </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId3"/></w:customXmlPr><w:r><w:t>B^{\prime }</w:t></w:r></w:customXml><w:r><w:t> </w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>\vec B = \mu_0(\vec H + \vec M)</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>\vec B_0 = \mu_0 \vec H</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>\vec{B' } = \mu_0 \vec M</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Допуская, что поле внутри соленоида однородно получим:</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>B = \mu_0 n I</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Где </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId7"/></w:customXmlPr><w:r><w:t>n=\frac{N}{L}</w:t></w:r></w:customXml><w:r><w:t>, N - число витков, L - длинна катушк, I - ток катушки.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Данная формула не позволяет учесть краевые эффекты на концах соленоида.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Элемент состовляющей </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId4"/></w:customXmlPr><w:r><w:t>B_0</w:t></w:r></w:customXml><w:r><w:t> можно будет найти по следующей формуле:</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/></w:customXmlPr><w:r><w:t>d\vec{B_0}(\vec{r})=\frac{\mu_0}{4\pi}\frac{3(\vec{r}-\vec{r_m})(\vec{\rho_m},(\vec{r}-\vec{r_m}))-\vec{\rho_m}||(\vec{r}-\vec{r_m})||^2}{||(\vec{r}-\vec{r_m})||^5}dL</w:t></w:r></w:customXml><w:r><w:t>        (3)</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>\vec{B_0} = \int_{L}d\vec{B_0}</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Где </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId8"/></w:customXmlPr><w:r><w:t>\overrightarrow{r}</w:t></w:r></w:customXml><w:r><w:t> - радиус вектор до точки, в которой необходимо найти магнитное поле, </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId9"/></w:customXmlPr><w:r><w:t>\overrightarrow{\;r_m }</w:t></w:r></w:customXml><w:r><w:t> - радиус вектор для элемента катушки, dL - элемент длинны катушки, </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId10"/></w:customXmlPr><w:r><w:t>\rho_m</w:t></w:r></w:customXml><w:r><w:t> - плотность магнитного момента катушки.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Плотность магнитного момента будет рассчитываться по следуующей формуле:</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>\vec{\rho_m} = \vec n\frac{ISN}{L}</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Где </w:t></w:r><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/><w:attr w:name="encoding" w:val="mathml"/><w:attr w:name="relationshipId" w:val="rId11"/></w:customXmlPr><w:r><w:t>\overrightarrow{\;n}</w:t></w:r></w:customXml><w:r><w:t> - вектор нормали, I - ток протекающий через катушку, S - площадь охватываемая витком катушки, N - число витков.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t></w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Так как намагниченность, по сути, является плотностью магнитного момента материала, то мы можем</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t> использовать её для расчёта элемента магнитной индукции создаваемым сердечником:</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="false"/></w:customXmlPr><w:r><w:t>d\vec{B'}(\vec{r})=\frac{\mu_0}{4\pi}\frac{3(\vec{r}-\vec{r_m})(\vec{M},(\vec{r}-\vec{r_m}))-\vec{M}||(\vec{r}-\vec{r_m})||^2}{||(\vec{r}-\vec{r_m})||^5}dV</w:t></w:r></w:customXml><w:r><w:t>            (4)</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>\vec{B'} = \int_{V}d\vec{B'}</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Начальные данные</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[%{
+syms x y z x0 y0 z0 r
+sl = solve((x-x0)^2+(y-y0)^2 == r^2, y)
+
+clearvars -except L fn_Bx fn_By fn_Bz fn_B r_in bx by bz mynorm
+syms M x y z xx yy zz m0 b real
+I = 99e-3;%Ток в катушке
+n = 700;% Число витков
+D = 20.9e-3;% Диаметр катушки
+d_in = 13.5e-3
+ro = [1,0,0]*I*pi*(D/2)^2*n/L;%Плотность магнитного момента катушки
+
+%Зададим уравненияе описывающее геометрию сердечника
+R = 1e-2;%м
+x0 = 0;
+y0 = 0;
+z0 = d_in/2-R;
+L_core = L;
+geom_core = (yy-y0)^2+(zz-z0)^2 == R^2
+sl = solve(geom_core,zz)
+
+r = [x,y,z]; %Радиус вектор до точки
+rm = [xx,yy,zz]; % Радиус-вектор до элемента объёма сердечника
+vec_M = [M,0,0]; % Вектор намагниченности вещества
+dB_core = (m0/(4*pi)) * (3*(r-rm)*dot(vec_M,(r-rm))/mynorm(r-rm)^5-vec_M/mynorm(r-rm)^3) % Элемент индукции созданный сердечником
+dB_core(1)
+dB_core(2)
+dB_core(3)
+%{
+%Получение Bx_core с переходом в цилиндрическую систему координат
+%Не получилось
+rho = sym('rho',['real','positive'])%Радиус до точки в которой ищется поле
+rho_c = sym('rho_c',['real','positive'])%Радиус до элемента объёма сердечника
+
+phi = sym('phi',['real','positive'])%Угол до точки
+phi_c = sym('phi_c',['real','positive'])% угол до элемента объёма
+
+fn = subs(-1/mynorm(r-rm)^3,[y z yy zz], [rho*cos(phi), rho*sin(phi), rho_c*cos(phi_c), rho_c*sin(phi_c)])
+%}
+
+%Без перехода в цилиндрическую систему координат
+fn = -1/mynorm(r-rm)^3
+var = int(fn,zz)
+var = subs(var,zz,sl(2))-subs(var,zz,sl(1))
+var = int(var, yy)
+var = subs(var,yy,R)-subs(var,yy,-R)
+var = int(var, xx)
+var = subs(var,xx,L)-subs(var,xx,0)
+half_Bx1 = var
+fn = ((x-xx)^2)/(mynorm(r-rm))^5
+var = int(fn,zz)
+var = subs(var,zz,sl(2))-subs(var,zz,sl(1))
+var = int(var, yy)
+var = subs(var,yy,R)-subs(var,yy,-R)
+var = int(var, xx)
+var = subs(var,xx,L)-subs(var,xx,0)
+half_Bx2 =  var
+
+Bx_core = (m0*M/(4*pi))*(half_Bx1 + 3*half_Bx2)
+sl = solve(Bx_core == b,M)
+%b_ferr_x = bx - fn_Bx(ro,r_in)
+%}]]></w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t></w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t></w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t></w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t></w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t></w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t></w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t></w:t></w:r></w:p></w:body></w:document>

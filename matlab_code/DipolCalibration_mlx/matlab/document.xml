@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Вывод формул расчёта магнитного момента</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Плотность магнитного момента:</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>\vec{ \rho_m} = \frac{\vec{m}N}{L}</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Элементарный элемент магнитной индукции создаваемый элементом соленоида</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:customXml w:element="equation"><w:customXmlPr><w:attr w:name="displayStyle" w:val="true"/></w:customXmlPr><w:r><w:t>d\vec{B}(\vec{r})=\frac{\mu_0}{4\pi}\frac{3(\vec{r}-\vec{r_m})(\vec{\rho_m},(\vec{r}-\vec{r_m}))-\vec{\rho_m}||(\vec{r}-\vec{r_m})||^2}{||(\vec{r}-\vec{r_m})||^5}dL</w:t></w:r></w:customXml></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[clear
+mynorm = @(r) (sqrt(sum(r.^2)))
+syms m0 l real positive
+syms x y z real positive
+r = [x,y,z]; % Радиус-вектор до точки
+ro = sym('ro', 'real'); %Плотность магнитного момента
+rm = [l,0,0]; %Радиус-вектор до элементарного элменета катушки
+%B = [Bx, By, Bz];
+assumptions
+
+L = 145e-3;%Длинна катушки примерное 137мм
+
+vec_ro = [ro,0,0]
+dB = (m0/(4*pi)) * (3*(r-rm)*dot(vec_ro,(r-rm))/mynorm(r-rm)^5-vec_ro/mynorm(r-rm)^3)
+
+syms bx by bz b real
+
+%Интегрирование Bx
+fn= 1/((l-x)^2+(y)^2+(z)^2)^sym(3/2)
+half_Bx1(l) = int(fn,l)
+fn = (l-x)*(l-x)/(mynorm([l-x,y,z]))^5
+half_Bx2(l) = 3*int(fn,l)
+Bx = (m0*ro/(4*pi))*((half_Bx2(L)-half_Bx2(0))-(half_Bx1(L)-half_Bx1(0)))
+
+fn_Bx = matlabFunction(subs(simplify(Bx),m0,4e-7*pi));
+fn_rox = matlabFunction(subs(simplify(solve(bx == Bx, ro)),m0,4e-7*pi));
+
+%Интегрирование By
+By = simplify(subs(int(dB(2),l),l,L) - subs(int(dB(2),l),l,0))
+
+fn_By = matlabFunction(subs(simplify(By),m0,4e-7*pi));
+fn_roy = matlabFunction(subs(simplify(solve(by == By, ro)),m0,4e-7*pi));
+
+%Интегрирование Bz
+Bz = simplify(subs(int(dB(3),l),l,L) - subs(int(dB(3),l),l,0))
+
+fn_Bz = matlabFunction(subs(simplify(Bz),m0,4e-7*pi));
+fn_roz = matlabFunction(subs(simplify(solve(bz == Bz, ro)),m0,4e-7*pi));
+
+%Модуль вектора B 
+B = mynorm([Bx,By,Bz]);
+
+fn_B = matlabFunction(subs(B,m0,4e-7*pi));
+fn_ro = matlabFunction(subs(solve(b == B, ro),m0,4e-7*pi));
+
+clear bx by bz b
+%dot - скалярное произведение векторов
+]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Экспериментальные данные</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[
+%{
+Многог измерений
+r = ...
+    [0:1e-2:21e-2;...x
+     repelem(64e-3+7.5e-3,22);...y
+     repelem(-2.95e-3,22)];%z
+ Bin = 
+%}
+
+r_in = ...
+    [[0:1e-2:21e-2]+5e-3;...x поправка изнчально - -20e-3
+     repelem(64e-3+7.5e-3,22);...y
+     repelem(-2.95e-3,22)];%z
+bx = 1e-6.*([18.7, 26.6, 34.3, 41.1, 46.3, 49.8, 51.5, 51.4, 49.5, 45.8, 40.6, 34, 26.2, 17.7, 9.2, 1.5, -6.2, -12.7, -17.7, -21.1, -23.2, -24.1]+5);
+by = 1e-6.*([61.3, 61, 58.9, 56.6, 50.4, 44.1, 36.2, 28.1, 19.3, 10.9, 2.2, -5.4, -2.5, -18.4, -22.9, -25.8, -27.3, -27.2, -25.9, -23.3, -20.1, -16.2]-15.7);
+bz = 1e-6.*([-32.2, -32.5, -32.9, -33.1, -36.0, -37.4, -39.4, -41.6, -43.6, -45.7, -48.2, -50, -52, -53.3, -54.5, -55.1, -55, -55, -54.2, -53.3, -52.5, -51.5]+42.5);
+bz = -1.*bz;%В какую сторону направлен bz?
+
+
+
+%m0 = 4e-7*pi;
+%L = 137e-3;
+%{
+Не работает
+syms x y z xl real
+syms B_in real
+syms ro real positive
+r = [x,y,z];
+fL = (2*(x - L)^2 + abs(y)^2 + abs(z)^2)/(3*(abs(y)^2 + abs(z)^2)^2*((x - L)^2 + abs(y)^2 + abs(z)^2)^(1/2)) - ((x - L)^2*(2*(x - L)^2 + 3*abs(y)^2 + 3*abs(z)^2))/(3*(abs(y)^2 + abs(z)^2)^2*((x - L)^2 + abs(y)^2 + abs(z)^2)^(3/2));
+fzero = (2*(x - 0)^2 + abs(y)^2 + abs(z)^2)/(3*(abs(y)^2 + abs(z)^2)^2*((x - 0)^2 + abs(y)^2 + abs(z)^2)^(1/2)) - ((x - 0)^2*(2*(x - 0)^2 + 3*abs(y)^2 + 3*abs(z)^2))/(3*(abs(y)^2 + abs(z)^2)^2*((x - 0)^2 + abs(y)^2 + abs(z)^2)^(3/2));
+func(r) = fL-fzero;
+Bz = func*m0*ro*z/(4*pi);
+By = func*m0*ro*y/(4*pi);
+gL = -L*x^2+x*L^2/2-L^3/3-y*L-z*L;
+gzero = -0*x^2+x*0^2/2-0^3/3-y*0-z*0;
+gg(r) = gL - gzero;
+Bx = (func+gg)*m0*ro*y/(4*pi);
+B = mynorm([Bx,By,Bz]);
+RO = simplify(solve(B == B_in,ro));
+fnRO = matlabFunction(simplify(RO(1)));
+
+for i = 1:size(Bin,2)
+    BB = mynorm(Bin(:,i));
+end
+
+result_ro = fnRO(BB,r_in(1,:),r_in(2,:),r_in(3,:))
+clear BB;
+mean(result_ro)
+
+result_M = mean(result_ro)*L
+Bm = result_M*m0/(4*pi)
+fn_Bx = matlabFunction(Bx);
+fn_Bx([0:1e-2:10e-2],[repelem(64e-3+7.5e-3,11)],[repelem(-2.95e-3,11)],mean(result_ro))
+%}
+]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Составляющие B по отдельным компонентам (bx,by,bz)</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[%{
+disp("Составляющие B по отдельным компонентам (bx,by,bz)");
+num_ro = fn_rox(bx,r_in(1,:),r_in(2,:),r_in(3,:));
+RO = mean(num_ro(1,:))
+
+fg_alsobx = figure("Name","also_Bx");
+plot(r_in(1,:),bx);
+grid on; grid minor;
+hold on
+X = -29e-2:1e-2:29e-2;
+N = size(X,2);
+bx_aprox = fn_Bx(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bx_aprox,"--");
+%clear N X
+legend("B_x","fn_{Bx}")
+hold off
+
+
+num_ro = fn_roy(by,r_in(1,:),r_in(2,:),r_in(3,:));
+RO = mean(num_ro(1,:))
+
+fg_alsoby = figure("Name","also_By");
+plot(r_in(1,:),by);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+by_aprox = fn_By(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,by_aprox,"--");
+%clear N X
+legend("B_y","fn_{By}")
+hold off
+
+
+num_ro = fn_roz(bz,r_in(1,:),r_in(2,:),r_in(3,:));
+RO = mean(num_ro(1,:))
+
+fg_alsobz = figure("Name","also_Bz");
+plot(r_in(1,:),bz);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+bz_aprox = fn_Bz(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bz_aprox,"--");
+legend("B_z","fn_{Bz}")
+hold off
+%--
+%}]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[disp("Использование всех состовляющих");
+b = mynorm([bx;by;bz]);
+num_ro = fn_ro(b,r_in(1,:),r_in(2,:),r_in(3,:));%Почему то выдаёт2 решения
+delta_ro = abs(tinv(0.95, size(num_ro(1,:),2))*std(num_ro(1,:))/sqrt(size(num_ro(1,:),2)))
+RO = mean(num_ro(1,:));
+disp("RO = "+num2str(RO)+"+-"+num2str(delta_ro));
+disp("Относительная погрешность: "+num2str(100*delta_ro/RO)+"%")
+
+fg1 = figure("Name","Bx");
+title("Bx при использовании всех данных"); xlabel("x [м]"); ylabel("B_x [Тл]");
+plot(r_in(1,:),bx);
+grid on; grid minor;
+hold on
+X = -29e-2:1e-2:29e-2;
+N = size(X,2);
+bx_aprox = fn_Bx(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bx_aprox,"--black");
+bx_aprox_pos_delta = fn_Bx(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+bx_aprox_neg_delta = fn_Bx(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bx_aprox_pos_delta,":black");
+plot(X,bx_aprox_neg_delta,":black");
+
+ 
+fg2 = figure("Name","By");
+title("By при использовании всех данных"); xlabel("x [м]"); ylabel("B_y [Тл]");
+plot(r_in(1,:),by);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+by_aprox = fn_By(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,by_aprox,"--");
+by_aprox_pos_delta = fn_By(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+by_aprox_neg_delta = fn_By(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,by_aprox_pos_delta,":black");
+plot(X,by_aprox_neg_delta,":black");
+%clear N X
+legend("B_y","fn_{By}")
+hold off
+
+fg3 = figure("Name","Bz");
+title("Bz при использовании всех данных"); xlabel("x [м]"); ylabel("B_z [Тл]");
+plot(r_in(1,:),bz);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+bz_aprox = fn_Bz(repelem(RO, N), X, repelem(r_in(2, 1), N), repelem(r_in(3, 1), N));
+plot(X,bz_aprox,"--");
+bz_aprox_pos_delta = fn_Bz(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+bz_aprox_neg_delta = fn_Bz(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bz_aprox_pos_delta,":black");
+plot(X,bz_aprox_neg_delta,":black");
+legend("B_z","fn_{Bz}")
+hold off
+
+fg5= figure("Name", "B");
+title("|B| при использовании всех данных"); xlabel("x [м]"); ylabel("|B| [Тл]");
+plot(r_in(1,:),mynorm([bx;by;bz]));
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+b_aprox = fn_B(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,b_aprox,"--");
+b_aprox_pos_delta = fn_B(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+b_aprox_neg_delta = fn_B(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,b_aprox_pos_delta,":black");
+plot(X,b_aprox_neg_delta,":black");
+legend("B","fn_{B}")
+hold off
+
+fg51 = figure("Name", "B_map3");
+quiver3(X,repelem(r_in(2,1),N),repelem(r_in(3,1),N), bx_aprox, by_aprox, bz_aprox, "Color","black");
+hold on
+xlabel("x [м]"); ylabel("y [м]"); zlabel("z [м]");
+%Положение катушки
+quiver3(r_in(1,:),r_in(2,:),r_in(3,:), bx, by, bz, "Color","blue");
+[Zc,Yc,Xc] = cylinder(20.9e-3/2);
+Zc = Zc.*185e-3;
+surf(Xc,Yc,Zc, "FaceAlpha",0.1,"FaceColor","red")
+
+legend("fn_{B}", "B", "Катушка");
+clear Xc Yc Zc
+hold off
+
+fg52 = figure("Name", "B_map2");
+quiver(X,repelem(r_in(2,1),N), bx_aprox, by_aprox, "Color","black");
+hold on
+quiver(r_in(1,:),r_in(2,:), bx, by, "Color","blue");
+xlabel("x [м]"); ylabel("y [м]"); %zlabel("z [м]");
+legend("fn_{B}", "B");
+rectangle("Position",[0, -20.9e-3/2, 185e-3, 20.9e-3])%Положение катушки
+hold off
+
+clear N X
+]]></w:t></w:r></w:p><w:p><w:pPr><w:sectPr/></w:pPr></w:p><w:p><w:pPr><w:pStyle w:val="text"/><w:jc w:val="left"/></w:pPr><w:r><w:t>Рассчёты при занулении bz</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[bz = repelem(0,size(bx,2));
+
+b = mynorm([bx;by;bz]);
+num_ro = fn_ro(b,r_in(1,:),r_in(2,:),r_in(3,:));%Почему то выдаёт2 решения
+delta_ro = abs(tinv(0.95, size(num_ro(1,:),2))*std(num_ro(1,:))/sqrt(size(num_ro(1,:),2)))
+RO = mean(num_ro(1,:));
+disp("RO = "+num2str(RO)+"+-"+num2str(delta_ro));
+disp("Относительная погрешность: "+num2str(100*delta_ro/RO)+"%")
+
+bz0_fg1 = figure("Name","Bx");
+title("Bx при занулении эксп. Bz"); xlabel("x [м]"); ylabel("B_x [Тл]");
+plot(r_in(1,:),bx);
+grid on; grid minor;
+hold on
+X = -29e-2:1e-2:29e-2;
+N = size(X,2);
+bx_aprox = fn_Bx(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bx_aprox,"--");
+bx_aprox_pos_delta = fn_Bx(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+bx_aprox_neg_delta = fn_Bx(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bx_aprox_pos_delta,":black");
+plot(X,bx_aprox_neg_delta,":black");
+%clear N X
+legend("B_x","fn_{Bx}")
+hold off
+
+
+bz0_fg2 = figure("Name","By");
+title("By при занулении эксп. Bz"); xlabel("x [м]"); ylabel("B_y [Тл]");
+plot(r_in(1,:),by);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+by_aprox = fn_By(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,by_aprox,"--");
+by_aprox_pos_delta = fn_By(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+by_aprox_neg_delta = fn_By(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,by_aprox_pos_delta,":black");
+plot(X,by_aprox_neg_delta,":black");
+%clear N X
+legend("B_y","fn_{By}")
+hold off
+
+bz0_fg3 = figure("Name","Bz");
+title("Bz при занулении эксп. Bz"); xlabel("x [м]"); ylabel("B_z [Тл]");
+plot(r_in(1,:),bz);
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+bz_aprox = fn_Bz(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bz_aprox,"--");
+bz_aprox_pos_delta = fn_Bz(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+bz_aprox_neg_delta = fn_Bz(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,bz_aprox_pos_delta,":black");
+plot(X,bz_aprox_neg_delta,":black");
+legend("B_z","fn_{Bz}")
+hold off
+
+bz0_fg5= figure("Name", "B");
+title("B при занулении эксп. Bz"); xlabel("x [м]"); ylabel("B [Тл]");
+plot(r_in(1,:),mynorm([bx;by;bz]));
+grid on; grid minor;
+hold on
+%X = -29e-2:1e-2:29e-2;
+%N = size(X,2);
+b_aprox = fn_B(repelem(RO,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,b_aprox,"--");
+b_aprox_pos_delta = fn_B(repelem(RO+delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+b_aprox_neg_delta = fn_B(repelem(RO-delta_ro,N),X,repelem(r_in(2,1),N),repelem(r_in(3,1),N));
+plot(X,b_aprox_pos_delta,":black");
+plot(X,b_aprox_neg_delta,":black");
+legend("B","fn_{B}")
+hold off
+
+bz0_fg51 = figure("Name", "B_map3");
+quiver3(X,repelem(r_in(2,1),N),repelem(r_in(3,1),N), bx_aprox, by_aprox, bz_aprox, "Color","black");
+hold on
+quiver3(r_in(1,:),r_in(2,:),r_in(3,:), bx, by, bz, "Color","blue");
+xlabel("x [м]"); ylabel("y [м]"); zlabel("z [м]");
+%Положение катушки
+[Zc,Yc,Xc] = cylinder(20.9e-3/2);
+Zc = Zc.*185e-3;
+surf(Xc,Yc,Zc, "FaceAlpha",0.1,"FaceColor","red")
+
+legend("fn_{B}", "B", "Катушка");
+clear Xc Yc cZ
+hold off
+
+bz0_fg52 = figure("Name", "B_map2");
+quiver(X,repelem(r_in(2,1),N), bx_aprox, by_aprox, "Color","black");
+hold on
+quiver(r_in(1,:),r_in(2,:), bx, by, "Color","blue");
+xlabel("x [м]"); ylabel("y [м]"); %zlabel("z [м]");
+legend("fn_{B}", "B");
+rectangle("Position",[0, -20.9e-3/2, 185e-3, 20.9e-3])%Положение катушки
+hold off
+
+clear N X]]></w:t></w:r></w:p></w:body></w:document>
