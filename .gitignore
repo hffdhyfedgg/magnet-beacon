@@ -2,3 +2,8 @@ tmp/
 dev-with_antigravity/
 .agentic/
 .venv/
+
+*.png
+*.bmp
+*.jpg
+*.jpeg

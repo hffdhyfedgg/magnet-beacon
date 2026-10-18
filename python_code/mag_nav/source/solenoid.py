@@ -97,8 +97,8 @@ def loop_field_cylindrical(
 
     a = float(radius)
     a2 = a * a
-    s = a2 + rho_b**2 + z_b**2          # a^2 + rho^2 + zeta^2
-    alpha_sq = s + 2.0 * a * rho_b      # (a+rho)^2 + zeta^2
+    s = a2 + rho_b**2 + z_b**2  # a^2 + rho^2 + zeta^2
+    alpha_sq = s + 2.0 * a * rho_b  # (a+rho)^2 + zeta^2
     beta_sq = np.maximum(s - 2.0 * a * rho_b, 1e-300)  # (a-rho)^2 + zeta^2
     alpha = np.sqrt(alpha_sq)
 
@@ -156,9 +156,7 @@ class Solenoid(MagneticSource):
         Политика первого квадранта.
     """
 
-    origin: NDArray[np.float64] = field(
-        default_factory=lambda: np.zeros(3, dtype=np.float64)
-    )
+    origin: NDArray[np.float64] = field(default_factory=lambda: np.zeros(3, dtype=np.float64))
     n_turns: int = 100
     current: float = 1.0
     radius: float = 0.05
@@ -235,16 +233,14 @@ class Solenoid(MagneticSource):
 
         return np.stack([b_rho * cos_phi, b_rho * sin_phi, b_zeta], axis=-1)
 
-    def field_at_phase(
-        self, points: ArrayLike, phase: float = 0.0
-    ) -> NDArray[np.float64]:
+    def field_at_phase(self, points: ArrayLike, phase: float = 0.0) -> NDArray[np.float64]:
         rel = self.relative_points(points)
         if self.quadrant_policy is QuadrantPolicy.STRICT and not np.allclose(self.origin, 0.0):
             rel = enforce_quadrant(rel, QuadrantPolicy.STRICT)
 
         axis = self.coil_axis(phase)
-        R = orthonormal_frame(axis)          # столбцы: e1_perp, e2_perp, axis
-        p_local = rel @ R                     # R.T @ p  (для строк)
+        R = orthonormal_frame(axis)  # столбцы: e1_perp, e2_perp, axis
+        p_local = rel @ R  # R.T @ p  (для строк)
         b_local = self.field_local(p_local)
         return b_local @ R.T
 
@@ -260,24 +256,18 @@ class Solenoid(MagneticSource):
             quadrant_policy=self.quadrant_policy,
         )
 
-    def field_dipole_approx(
-        self, points: ArrayLike, phase: float = 0.0
-    ) -> NDArray[np.float64]:
+    def field_dipole_approx(self, points: ArrayLike, phase: float = 0.0) -> NDArray[np.float64]:
         """Дипольное приближение поля соленоида."""
         rel = self.relative_points(points)
         return dipole_field(rel, self.coil_axis(phase), self.dipole_constant)
 
-    def relative_deviation(
-        self, points: ArrayLike, phase: float = 0.0
-    ) -> NDArray[np.float64]:
+    def relative_deviation(self, points: ArrayLike, phase: float = 0.0) -> NDArray[np.float64]:
         """Относительное расхождение моделей ``||B_sol - B_dip|| / ||B_dip||``."""
         b_sol = self.field_at_phase(points, phase)
         b_dip = self.field_dipole_approx(points, phase)
         return safe_norm(b_sol - b_dip) / safe_norm(b_dip)
 
-    def amplitude_deviation(
-        self, points: ArrayLike, phase: float = 0.0
-    ) -> NDArray[np.float64]:
+    def amplitude_deviation(self, points: ArrayLike, phase: float = 0.0) -> NDArray[np.float64]:
         """Расхождение **амплитуд** ``|B_sol| / |B_dip| - 1``."""
         return (
             safe_norm(self.field_at_phase(points, phase))
@@ -299,3 +289,65 @@ class Solenoid(MagneticSource):
         b = 0.5 * MU_0 * self.turns_density * self.current * (term1 - term2)
         axis = self.coil_axis(phase)
         return b[..., np.newaxis] * axis
+
+    # ---------- прямые адаптеры: момент / b0 -> Solenoid ---------- #
+    @classmethod
+    def from_moment(
+        cls,
+        moment: float,
+        radius: float,
+        length: float,
+        *,
+        n_turns: int = 100,
+        **kwargs,
+    ) -> "Solenoid":
+        """Создать соленоид по заданному магнитному моменту.
+
+        Число витков фиксируется (по умолчанию 100), а ток подбирается так,
+        чтобы произведение N*I дало ровно заданный момент:
+            I = m / (N * pi * R^2).
+        """
+        if moment <= 0:
+            raise ValueError("moment должен быть положительным")
+        current = float(moment) / (int(n_turns) * np.pi * radius**2)
+        return cls(
+            radius=radius,
+            length=length,
+            n_turns=int(n_turns),
+            current=current,
+            **kwargs,
+        )
+
+    @classmethod
+    def from_b0(
+        cls,
+        b0: float,
+        radius: float,
+        length: float,
+        *,
+        n_turns: int = 100,
+        **kwargs,
+    ) -> "Solenoid":
+        """Создать соленоид по заданной дипольной константе ``b0`` [Тл*м^3].
+
+        Использует связь m = 4*pi*b0 / mu0, т.е. ``b0`` здесь — ровно та же
+        величина, что и ``b0`` у ``RotatingDipole``. Поэтому дальние поля
+        (и излучаемая мощность на одной частоте) совпадают.
+        """
+        moment = 4.0 * np.pi * float(b0) / MU_0
+        return cls.from_moment(moment, radius, length, n_turns=n_turns, **kwargs)
+
+    # ---------- обратные адаптеры: Solenoid -> момент / b0 ---------- #
+    @property
+    def moment(self) -> float:
+        """Магнитный момент соленоида ``m = N*I*pi*R^2``, А*м^2."""
+        return self.magnetic_moment  # уже существует
+
+    @property
+    def b0(self) -> float:
+        """Дипольная константа ``b0 = mu0*m/(4*pi)``, Тл*м^3.
+
+        Это та же величина, что ``b0`` у ``RotatingDipole``: ``Solenoid.b0``
+        равен ``RotatingDipole.b0`` для согласованных маяков.
+        """
+        return self.dipole_constant  # уже существует
