@@ -16,8 +16,10 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
-from typing import Any, Literal, Sequence
+from typing import Any, Literal
+import warnings
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -26,17 +28,43 @@ from ..convention import as_points, norm, safe_norm
 from ..navigation.position import PositionSolution, solve_position
 from ..noise.base import NoiseModel
 from ..signal.ab_params import ABParams, ab_from_source
-from ..signal.recovery import (
-    DemodulationResult,
-    demodulate,
-    demodulate_lstsq,
-    make_phase_grid,
-    synthesize_series,
-)
+from ..signal.recovery import demodulate, demodulate_lstsq, synthesize_series
 from ..source.base import MagneticSource
 from .scenario import Scenario, SensorConfig, SimResult
 
 __all__ = ["MonteCarloSimulator", "MonteCarloResult"]
+
+
+# Контекст и точка входа для ProcessPoolExecutor должны быть модульными,
+# чтобы работать с multiprocessing spawn (Windows/macOS) и pickle.
+_MC_WORKER_CONTEXT: tuple[Any, ...] | None = None
+
+
+def _init_mc_worker(
+    simulator: "MonteCarloSimulator",
+    ab_true: ABParams,
+    rel_true: NDArray[np.float64],
+    phases: NDArray[np.float64] | None,
+    cos_sin: tuple[NDArray[np.float64], NDArray[np.float64]] | None,
+) -> None:
+    global _MC_WORKER_CONTEXT
+    _MC_WORKER_CONTEXT = (simulator, ab_true, rel_true, phases, cos_sin)
+
+
+def _mc_worker_run(task: tuple[int, bool]):
+    """Выполнить один seed в worker-процессе, возвращая минимум при keep_results=False."""
+    if _MC_WORKER_CONTEXT is None:  # pragma: no cover - защита от ручного вызова
+        raise RuntimeError("Контекст Monte Carlo worker не инициализирован")
+    simulator, ab_true, rel_true, phases, cos_sin = _MC_WORKER_CONTEXT
+    seed, keep_result = task
+    result = simulator._single_run(
+        np.random.default_rng(seed),
+        ab_true=ab_true,
+        rel_true=rel_true,
+        phases=phases,
+        cos_sin=cos_sin,
+    )
+    return result.error_abs, result.valid, result if keep_result else None
 
 
 # --------------------------------------------------------------------------- #
@@ -180,12 +208,22 @@ class MonteCarloSimulator:
         )
 
     # -- один пролёт ---------------------------------------------------------- #
-    def _single_run(self, rng: np.random.Generator) -> SimResult:
-        """Выполнить один прогон без создания нового ГСЧ извне."""
+    def _single_run(
+        self,
+        rng: np.random.Generator,
+        *,
+        ab_true: ABParams | None = None,
+        rel_true: NDArray[np.float64] | None = None,
+        phases: NDArray[np.float64] | None = None,
+        cos_sin: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None,
+    ) -> SimResult:
+        """Выполнить один прогон; инварианты можно передать уже вычисленными."""
         pts = self.trajectory
-        ab_true = ab_from_source(self.source, pts, n_harmonic=self.n_harmonic)
+        if ab_true is None:
+            ab_true = ab_from_source(self.source, pts, n_harmonic=self.n_harmonic)
         a_true, b_true = ab_true.a, ab_true.b
-        rel_true = self.source.relative_points(pts)
+        if rel_true is None:
+            rel_true = self.source.relative_points(pts)
 
         noise = self.active_noise
         mode = self.inject_at
@@ -208,13 +246,17 @@ class MonteCarloSimulator:
             meta["noise"] = noise.describe()
         elif mode == "samples":
             sensor = self.sensor or SensorConfig()
-            phases = sensor.phases()
-            series = synthesize_series(a_true, b_true, phases)
+            if phases is None:
+                phases = sensor.phases()
+            series = synthesize_series(a_true, b_true, phases, cos_sin=cos_sin)
             if noise is not None:
                 series = noise.apply(series, rng)
                 meta["noise"] = noise.describe()
             if sensor.demod_method == "lstsq":
-                demod = demodulate_lstsq(series, phases, with_dc=sensor.with_dc)
+                # Остаток МНК здесь не используется для метрик навигации.
+                demod = demodulate_lstsq(
+                    series, phases, with_dc=sensor.with_dc, compute_residual=False
+                )
             else:
                 demod = demodulate(series, phases)
             a_meas, b_meas = demod.a, demod.b
@@ -250,51 +292,92 @@ class MonteCarloSimulator:
         *,
         base_seed: int = 0,
         keep_results: bool = True,
+        n_workers: int = 1,
     ) -> MonteCarloResult:
-        """Прогнать ``n_trials`` реализаций и агрегировать метрики.
+        """Прогнать ансамбль реализаций и агрегировать метрики.
 
-        Parameters
-        ----------
-        n_trials :
-            Число реализаций шума.
-        base_seed :
-            Начальный seed; реализация ``k`` получает ``base_seed + k``.
-        keep_results :
-            Сохранять ли полные :class:`SimResult` (для детальной диагностики).
-
-        Returns
-        -------
-        MonteCarloResult
+        ``a_true``, ``b_true`` и относительные координаты не зависят от шума,
+        поэтому вычисляются один раз до цикла. При ``n_workers > 1`` реализации
+        исполняются отдельными процессами; ``base_seed + k`` сохраняет
+        воспроизводимость независимо от порядка выполнения.
         """
         if n_trials < 1:
             raise ValueError("n_trials >= 1")
+        if n_workers < 1:
+            raise ValueError("n_workers >= 1")
 
+        n_trials = int(n_trials)
+        n_workers = int(n_workers)
         n_pts = self.trajectory.shape[0]
         errors = np.full((n_trials, n_pts, 3), np.nan, dtype=np.float64)
         valid = np.zeros((n_trials, n_pts), dtype=np.bool_)
         results: list[SimResult] = []
 
-        for k in range(n_trials):
-            rng = np.random.default_rng(base_seed + k)
-            res = self._single_run(rng)
-            errors[k] = res.error_abs
-            valid[k] = res.valid
+        # Главный выигрыш: поле конечного соленоида больше не вычисляется для
+        # каждой новой реализации шума.
+        ab_true = ab_from_source(self.source, self.trajectory, n_harmonic=self.n_harmonic)
+        rel_true = self.source.relative_points(self.trajectory)
+
+        # Параметры сигнала также одинаковы между реализациями.
+        effective_mode = self.inject_at if self.active_noise is not None else "none"
+        phases: NDArray[np.float64] | None = None
+        cos_sin: tuple[NDArray[np.float64], NDArray[np.float64]] | None = None
+        if effective_mode == "samples":
+            sensor_cfg = self.sensor or SensorConfig()
+            phases = sensor_cfg.phases()
+            cos_sin = (np.cos(phases), np.sin(phases))
+
+        if n_workers > 1:
             if keep_results:
-                results.append(res)
+                warnings.warn(
+                    "n_workers > 1 и keep_results=True пересылают полные SimResult "
+                    "между процессами; для больших ансамблей используйте keep_results=False.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            tasks = ((base_seed + k, keep_results) for k in range(n_trials))
+            with ProcessPoolExecutor(
+                max_workers=min(n_workers, n_trials),
+                initializer=_init_mc_worker,
+                initargs=(self, ab_true, rel_true, phases, cos_sin),
+            ) as pool:
+                outcomes = pool.map(_mc_worker_run, tasks)
+                for k, (err, res_valid, res) in enumerate(outcomes):
+                    errors[k] = err
+                    valid[k] = res_valid
+                    if res is not None:
+                        results.append(res)
+        else:
+            for k in range(n_trials):
+                rng = np.random.default_rng(base_seed + k)
+                res = self._single_run(
+                    rng,
+                    ab_true=ab_true,
+                    rel_true=rel_true,
+                    phases=phases,
+                    cos_sin=cos_sin,
+                )
+                errors[k] = res.error_abs
+                valid[k] = res.valid
+                if keep_results:
+                    results.append(res)
 
         # --- L2 (RMSE) ---
         # По каждой точке: RMSE по реализациям
         err_norm = np.linalg.norm(errors, axis=-1)  # (n_trials, n_pts)
-        err_norm_masked = np.where(valid, err_norm, np.nan)
-
-        with np.errstate(invalid="ignore"):
-            l2_per_point = np.sqrt(np.nanmean(err_norm_masked**2, axis=0))
-            all_valid_norms = err_norm[valid]
-            l2_global = (
-                float(np.sqrt(np.mean(all_valid_norms**2)))
-                if all_valid_norms.size
-                else float("nan")
-            )
+        # Явный счётчик валидных значений избегает RuntimeWarning от nanmean,
+        # если в отдельных точках все реализации невалидны.
+        valid_counts = np.sum(valid, axis=0)
+        squared_sum = np.sum(np.where(valid, err_norm**2, 0.0), axis=0)
+        mean_squared = np.full(n_pts, np.nan, dtype=np.float64)
+        np.divide(squared_sum, valid_counts, out=mean_squared, where=valid_counts > 0)
+        l2_per_point = np.sqrt(mean_squared)
+        all_valid_norms = err_norm[valid]
+        l2_global = (
+            float(np.sqrt(np.mean(all_valid_norms**2)))
+            if all_valid_norms.size
+            else float("nan")
+        )
 
         # Относительная: нормировка на среднюю дальность
         r_true = norm(self.trajectory - self.source.origin, axis=-1)
@@ -305,8 +388,11 @@ class MonteCarloSimulator:
         # Для каждой реализации: максимум |ошибки| по точкам и осям
         abs_errors = np.abs(errors)  # (n_trials, n_pts, 3)
         abs_errors_masked = np.where(valid[..., np.newaxis], abs_errors, 0.0)
+        has_valid_per_trial = np.any(valid, axis=1)
         l_inf_per_trial = np.max(abs_errors_masked, axis=(1, 2))  # (n_trials,)
-        l_inf_global = float(np.mean(l_inf_per_trial))
+        l_inf_per_trial = np.where(has_valid_per_trial, l_inf_per_trial, np.nan)
+        valid_l_inf = l_inf_per_trial[has_valid_per_trial]
+        l_inf_global = float(np.mean(valid_l_inf)) if valid_l_inf.size else float("nan")
 
         return MonteCarloResult(
             n_trials=n_trials,

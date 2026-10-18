@@ -36,6 +36,7 @@ __all__ = [
     "plot_model_discrepancy",
     "plot_boundary_radius",
     "plot_monte_carlo",
+    "plot_monte_carlo_error_vs_range",
     "animate_navigation",
     "save_figures",
 ]
@@ -315,7 +316,16 @@ def plot_error_histogram(
     figsize: tuple[float, float] = (11.0, 3.4),
 ) -> Figure:
     """Гистограммы погрешностей по осям и по модулю."""
-    if isinstance(result, MonteCarloSummary):
+    if hasattr(result, "errors") and hasattr(result, "valid"):
+        # MonteCarloResult из MonteCarloSimulator (не требует хранить SimResult
+        # для каждого прогона, поэтому подходит для keep_results=False).
+        errors = np.asarray(result.errors, dtype=np.float64)
+        mask = np.asarray(result.valid, dtype=bool) & np.all(np.isfinite(errors), axis=-1)
+        stack = errors[mask]
+        norms = np.linalg.norm(stack, axis=-1)
+    elif isinstance(result, MonteCarloSummary):
+        if not result.results:
+            raise ValueError("Для MonteCarloSummary нужны results; либо используйте MonteCarloResult")
         stack = np.concatenate([r.error_abs[r.valid] for r in result.results], axis=0)
         norms = np.concatenate([r.error_norm[r.valid] for r in result.results], axis=0)
     else:
@@ -323,19 +333,24 @@ def plot_error_histogram(
         norms = result.error_norm[result.valid]
 
     fig, axes = plt.subplots(1, 4, figsize=figsize)
-    for k, (ax, lbl, col) in enumerate(
-        zip(axes[:3], "xyz", ["tab:blue", "tab:orange", "tab:green"])
-    ):
-        ax.hist(stack[:, k], bins=bins, color=col, alpha=0.8)
+    if stack.size == 0:
+        for ax, title in zip(axes, ("ΔX", "ΔY", "ΔZ", "|Δr|")):
+            ax.text(0.5, 0.5, "Нет валидных решений", ha="center", va="center", transform=ax.transAxes)
+            ax.set_title(title)
+    else:
+        for k, (ax, lbl, col) in enumerate(
+            zip(axes[:3], "xyz", ["tab:blue", "tab:orange", "tab:green"])
+        ):
+            ax.hist(stack[:, k], bins=bins, color=col, alpha=0.8)
+            if log:
+                ax.set_yscale("log")
+            ax.set_xlabel(f"Δ{lbl}, м")
+            ax.set_title(f"{lbl.upper()}: σ={np.std(stack[:, k]):.2e}")
+        axes[3].hist(norms, bins=bins, color="tab:red", alpha=0.8)
         if log:
-            ax.set_yscale("log")
-        ax.set_xlabel(f"Δ{lbl}, м")
-        ax.set_title(f"{lbl.upper()}: σ={np.std(stack[:, k]):.2e}")
-    axes[3].hist(norms, bins=bins, color="tab:red", alpha=0.8)
-    if log:
-        axes[3].set_yscale("log")
-    axes[3].set_xlabel("|Δr|, м")
-    axes[3].set_title(f"|Δr|: RMS={np.sqrt(np.mean(norms**2)):.2e}")
+            axes[3].set_yscale("log")
+        axes[3].set_xlabel("|Δr|, м")
+        axes[3].set_title(f"|Δr|: RMS={np.sqrt(np.mean(norms**2)):.2e}")
     for ax in axes:
         ax.grid(alpha=0.3)
     fig.tight_layout()
@@ -599,29 +614,60 @@ def plot_boundary_radius(
 # Монте-Карло
 # --------------------------------------------------------------------------- #
 def plot_monte_carlo(
-    mc: MonteCarloSummary, *, figsize: tuple[float, float] = (11.5, 4.0)
+    mc: Any, *, figsize: tuple[float, float] = (11.5, 4.0)
 ) -> Figure:
-    """Средняя погрешность по точкам траектории + разброс."""
-    fig, axes = plt.subplots(1, 2, figsize=figsize)
-    idx = np.arange(mc.error_norm_mean.size)
+    """Средняя погрешность по точкам траектории + разброс.
 
-    axes[0].plot(idx, mc.error_norm_mean, "b-", lw=1.4, label="среднее")
+    Принимает как ``MonteCarloSummary`` (Scenario API), так и
+    ``MonteCarloResult`` (MonteCarloSimulator API).
+    """
+    if hasattr(mc, "errors") and hasattr(mc, "l2_per_point"):
+        err_norm = np.linalg.norm(np.asarray(mc.errors), axis=-1)
+        valid = np.asarray(mc.valid, dtype=bool) & np.isfinite(err_norm)
+        counts = np.sum(valid, axis=0)
+        sums = np.sum(np.where(valid, err_norm, 0.0), axis=0)
+        mean = np.full(err_norm.shape[1], np.nan, dtype=np.float64)
+        np.divide(sums, counts, out=mean, where=counts > 0)
+        squared_dev = np.sum(np.where(valid, (err_norm - mean[np.newaxis, :]) ** 2, 0.0), axis=0)
+        variance = np.full_like(mean, np.nan)
+        np.divide(squared_dev, counts, out=variance, where=counts > 0)
+        std = np.sqrt(variance)
+        rms = np.asarray(mc.l2_per_point, dtype=np.float64)
+        n_trials = int(mc.n_trials)
+        errors = np.asarray(mc.errors, dtype=np.float64)
+        n_valid = int(np.count_nonzero(valid))
+        if n_valid:
+            per_component_rms = np.sqrt(
+                np.sum(np.where(valid[..., np.newaxis], errors**2, 0.0), axis=(0, 1)) / n_valid
+            )
+        else:
+            per_component_rms = np.full(3, np.nan)
+    else:
+        mean = np.asarray(mc.error_norm_mean)
+        std = np.asarray(mc.error_norm_std)
+        rms = np.asarray(mc.rms_per_point)
+        n_trials = int(mc.n_trials)
+        per_component_rms = np.asarray(mc.per_component_rms)
+
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    idx = np.arange(mean.size)
+    axes[0].plot(idx, mean, "b-", lw=1.4, label="среднее")
     axes[0].fill_between(
         idx,
-        np.maximum(mc.error_norm_mean - mc.error_norm_std, 1e-16),
-        mc.error_norm_mean + mc.error_norm_std,
+        np.maximum(mean - std, 1e-16),
+        mean + std,
         color="b",
         alpha=0.2,
         label="±1σ",
     )
-    axes[0].plot(idx, mc.rms_per_point, "r--", lw=1.0, label="RMS")
+    axes[0].plot(idx, rms, "r--", lw=1.0, label="RMS / L2")
     axes[0].set_yscale("log")
     axes[0].set_xlabel("№ точки")
     axes[0].set_ylabel("|Δr|, м")
     axes[0].legend(fontsize=8)
-    axes[0].set_title(f"Монте-Карло, {mc.n_trials} реализаций")
+    axes[0].set_title(f"Монте-Карло, {n_trials} реализаций")
 
-    axes[1].bar(np.arange(3), mc.per_component_rms, color=["tab:blue", "tab:orange", "tab:green"])
+    axes[1].bar(np.arange(3), per_component_rms, color=["tab:blue", "tab:orange", "tab:green"])
     axes[1].set_xticks(np.arange(3), ["Δx", "Δy", "Δz"])
     axes[1].set_yscale("log")
     axes[1].set_ylabel("RMS, м")
@@ -629,6 +675,66 @@ def plot_monte_carlo(
     for ax in axes:
         ax.grid(alpha=0.3)
     fig.tight_layout()
+    return fig
+
+
+def plot_monte_carlo_error_vs_range(
+    mc: Any,
+    trajectory: ArrayLike,
+    *,
+    origin: ArrayLike = (0.0, 0.0, 0.0),
+    relative: bool = True,
+    loglog: bool = True,
+    trend: bool = True,
+    ax: plt.Axes | None = None,
+) -> Figure:
+    """Разброс ошибки ансамбля по дальности без сохранения полных SimResult."""
+    if not (hasattr(mc, "errors") and hasattr(mc, "valid")):
+        raise TypeError("Ожидается результат MonteCarloSimulator с полями errors и valid")
+    pts = as_points(trajectory)
+    o = np.asarray(origin, dtype=np.float64).reshape(3)
+    r = norm(pts - o, axis=-1)
+    errors = np.linalg.norm(np.asarray(mc.errors, dtype=np.float64), axis=-1)
+    valid = np.asarray(mc.valid, dtype=bool) & np.isfinite(errors) & (r[np.newaxis, :] > 0.0)
+    y = errors / r[np.newaxis, :] if relative else errors
+    x_grid = np.broadcast_to(r, y.shape)
+    valid &= np.isfinite(y) & (y > 0.0 if loglog else True)
+
+    fig = None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(6.8, 5.2))
+    else:
+        fig = ax.figure
+
+    x_values, y_values = x_grid[valid], y[valid]
+    # Ограничиваем число маркеров только для очень больших ансамблей.
+    if x_values.size > 50000:
+        take = np.linspace(0, x_values.size - 1, 50000).astype(int)
+        x_values, y_values = x_values[take], y_values[take]
+    ax.scatter(x_values, y_values, s=5, alpha=0.10, color="tab:blue", label="реализации")
+    if loglog:
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+
+    trend_y = np.asarray(mc.l2_per_point, dtype=np.float64)
+    if relative:
+        trend_y = trend_y / np.maximum(r, 1e-300)
+    trend_mask = np.isfinite(r) & np.isfinite(trend_y) & (r > 0.0) & (trend_y > 0.0 if loglog else True)
+    if trend and np.count_nonzero(trend_mask) > 8:
+        rr, yy = r[trend_mask], trend_y[trend_mask]
+        order = np.argsort(rr)
+        rr, yy = rr[order], yy[order]
+        if loglog:
+            k, c = np.polyfit(np.log(rr), np.log(np.maximum(yy, 1e-300)), 1)
+            ax.plot(rr, np.exp(c) * rr**k, "r-", lw=1.6, label=f"L2 ~ r^{{{k:.2f}}}")
+        else:
+            k, c = np.polyfit(rr, yy, 1)
+            ax.plot(rr, k * rr + c, "r-", lw=1.6, label=f"линейный тренд k={k:.2e}")
+        ax.legend(fontsize=8)
+
+    ax.set_xlabel("r, м")
+    ax.set_ylabel("относительная погрешность" if relative else "|Δr|, м")
+    ax.set_title("Погрешность Монте-Карло vs. дальность")
     return fig
 
 

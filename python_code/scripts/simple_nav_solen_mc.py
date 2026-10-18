@@ -12,6 +12,7 @@
     python simple_nav_solen_mc.py
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from mag_nav import (
@@ -21,6 +22,11 @@ from mag_nav import (
     line,
 )
 from mag_nav.sim.monte_carlo_sim import MonteCarloSimulator
+from mag_nav.sim.visualize import (
+    plot_error_histogram,
+    plot_monte_carlo,
+    plot_monte_carlo_error_vs_range,
+)
 
 
 def main() -> None:
@@ -107,7 +113,20 @@ def main() -> None:
             f"r≈{r_seg:.3f} м,  L2={np.nanmean(seg_l2):.3e} м"
         )
 
-    print("\nГотово.")
+    # ------------------------------------------------------------------ #
+    # 6. Визуализация ансамбля (ничего не сохраняется на диск)
+    # ------------------------------------------------------------------ #
+    plot_monte_carlo(mc)
+    plot_error_histogram(mc, bins=80)
+    plot_monte_carlo_error_vs_range(
+        mc,
+        trajectory,
+        origin=source.origin,
+        relative=True,
+    )
+
+    print("\nГотово. Открываю графики...")
+    plt.show()
 
 
 if __name__ == "__main__":

@@ -135,7 +135,7 @@ def norm(vec: ArrayLike, *, axis: int = -1, keepdims: bool = False) -> NDArray[n
 def safe_norm(vec: ArrayLike, *, axis: int = -1, keepdims: bool = False) -> NDArray[np.float64]:
     """То же, что :func:`norm`, но нули заменяются на ``EPS`` (защита от 0/0)."""
     n = norm(vec, axis=axis, keepdims=keepdims)
-    return np.where(n > EPS, n, EPS)
+    return np.maximum(n, EPS)
 
 
 def unit(vec: ArrayLike, *, axis: int = -1) -> NDArray[np.float64]:

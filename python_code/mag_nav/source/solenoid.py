@@ -91,9 +91,8 @@ def loop_field_cylindrical(
     """
     rho_a = np.asarray(rho, dtype=np.float64)
     z_a = np.asarray(zeta, dtype=np.float64)
+    # Только читаем broadcast-view: копировать входные массивы здесь не нужно.
     rho_b, z_b = np.broadcast_arrays(rho_a, z_a)
-    rho_b = np.array(rho_b, dtype=np.float64)
-    z_b = np.array(z_b, dtype=np.float64)
 
     a = float(radius)
     a2 = a * a
@@ -218,14 +217,18 @@ class Solenoid(MagneticSource):
         nq = int(n_quad or self.n_quad)
         t_nodes, weights = gauss_legendre(nq)
 
-        b_rho = np.zeros_like(rho)
-        b_zeta = np.zeros_like(pz)
+        # Одним векторизованным вызовом обрабатываем все узлы квадратуры.
+        # Форма: (n_quad, *shape_points); loop_field_cylindrical уже поддерживает
+        # broadcasting и применяет ellipk/ellipe к массивам.
         half_L = 0.5 * self.length
-        for ti, wi in zip(t_nodes, weights):
-            zeta = pz - half_L * ti
-            br, bz = loop_field_cylindrical(rho, zeta, self.radius, current=1.0)
-            b_rho += wi * br
-            b_zeta += wi * bz
+        point_ndim = pz.ndim
+        node_shape = (nq,) + (1,) * point_ndim
+        rho_all = np.broadcast_to(rho[np.newaxis, ...], (nq,) + rho.shape)
+        zeta_all = pz[np.newaxis, ...] - half_L * t_nodes.reshape(node_shape)
+        br_all, bz_all = loop_field_cylindrical(rho_all, zeta_all, self.radius, current=1.0)
+        weight_shape = weights.reshape(node_shape)
+        b_rho = np.sum(br_all * weight_shape, axis=0)
+        b_zeta = np.sum(bz_all * weight_shape, axis=0)
 
         factor = 0.5 * float(self.n_turns) * float(self.current)
         b_rho *= factor

@@ -20,7 +20,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import OrderedDict
+from dataclasses import dataclass, fields, is_dataclass
+from enum import Enum
+import hashlib
 from typing import Protocol
 
 import numpy as np
@@ -161,6 +164,34 @@ def first_harmonic(
     return a, b
 
 
+_AB_CACHE_MAXSIZE = 8
+_AB_CACHE: OrderedDict[tuple[object, ...], ABParams] = OrderedDict()
+
+
+def _source_fingerprint(source: MagneticSource) -> tuple[object, ...] | None:
+    """Fingerprint exact dataclass state; unsupported custom objects skip caching."""
+    if not is_dataclass(source):
+        return None
+    values: list[object] = [type(source).__module__, type(source).__qualname__]
+    for item in fields(source):
+        value = getattr(source, item.name)
+        if isinstance(value, np.ndarray):
+            arr = np.ascontiguousarray(value)
+            values.append((item.name, arr.dtype.str, arr.shape, arr.tobytes()))
+        elif isinstance(value, Enum):
+            values.append((item.name, type(value).__qualname__, value.value))
+        elif isinstance(value, (str, bytes, int, float, bool, type(None))):
+            values.append((item.name, type(value).__name__, value))
+        else:
+            return None
+    return tuple(values)
+
+
+def _copy_ab(ab: ABParams) -> ABParams:
+    """Не отдавать вызывающему коду изменяемые массивы из глобального кэша."""
+    return ABParams(a=ab.a.copy(), b=ab.b.copy(), exact=ab.exact)
+
+
 def ab_from_source(
     source: MagneticSource,
     points: ArrayLike,
@@ -175,15 +206,42 @@ def ab_from_source(
     Иначе — дискретное выделение первой гармоники по ``n_harmonic`` фазам.
     """
     pts = as_points(points)
+    source_key = _source_fingerprint(source)
+    # Ключ содержит точные байты геометрии и все параметры dataclass-источника.
+    # Если состояние источника нельзя надёжно сериализовать, вычисляем без кэша.
+    cache_key: tuple[object, ...] | None = None
+    if source_key is not None:
+        points_bytes = np.ascontiguousarray(pts, dtype=np.float64).tobytes()
+        cache_key = (
+            source_key,
+            pts.shape,
+            hashlib.md5(points_bytes).digest(),
+            n_harmonic,
+            bool(force_harmonic),
+        )
+        cached = _AB_CACHE.get(cache_key)
+        if cached is not None:
+            _AB_CACHE.move_to_end(cache_key)
+            return _copy_ab(cached)
+
     if source.is_quadrature_exact and not force_harmonic:
         a = source.field_at_phase(pts, 0.0)
         b = source.field_at_phase(pts, np.pi / 2.0)
-        return ABParams(a=a, b=b, exact=True)
+        result = ABParams(a=a, b=b, exact=True)
+    else:
+        phases = phase_grid(n_harmonic, source.phase_offset)
+        samples = np.empty((phases.size,) + pts.shape, dtype=np.float64)
+        for i, ph in enumerate(phases):
+            samples[i] = source.field_at_phase(pts, ph)
+        a, b = first_harmonic(samples, phases)
+        result = ABParams(a=a, b=b, exact=False)
 
-    phases = phase_grid(n_harmonic, source.phase_offset)
-    samples = np.stack([source.field_at_phase(pts, ph) for ph in phases], axis=0)
-    a, b = first_harmonic(samples, phases)
-    return ABParams(a=a, b=b, exact=False)
+    if cache_key is not None:
+        _AB_CACHE[cache_key] = _copy_ab(result)
+        _AB_CACHE.move_to_end(cache_key)
+        while len(_AB_CACHE) > _AB_CACHE_MAXSIZE:
+            _AB_CACHE.popitem(last=False)
+    return result
 
 
 def harmonic_residual(

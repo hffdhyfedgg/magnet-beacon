@@ -63,6 +63,7 @@ from .signal import (
     ab_invariants,
     demodulate,
     demodulate_lstsq,
+    demodulation_error,
     harmonic_residual,
     make_phase_grid,
     polarization_ellipse,
@@ -135,6 +136,7 @@ __all__ = [
     "synthesize_series",
     "demodulate",
     "demodulate_lstsq",
+    "demodulation_error",
     "MonteCarloSimulator",
     "MonteCarloResult",
     # navigation

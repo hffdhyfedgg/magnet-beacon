@@ -50,8 +50,6 @@ from ..convention import (
     EPS,
     QuadrantPolicy,
     as_points,
-    direction_cosines,
-    enforce_quadrant,
     norm,
     safe_norm,
 )
@@ -209,14 +207,16 @@ def recompose_position(r: ArrayLike, uvw: ArrayLike) -> NDArray[np.float64]:
 # --------------------------------------------------------------------------- #
 # Основной решатель
 # --------------------------------------------------------------------------- #
-def solve_from_invariants(
+def _solve_from_invariants_full(
     inv: ABInvariants,
     b0: float,
     *,
     tol: float = _DEFAULT_TOL,
     uvw_tol: float = 1e-6,
-) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.bool_], NDArray[np.int32]]:
-    """Ядро решения по уже посчитанным инвариантам. Возвращает ``(points, r, valid, reasons)``."""
+) -> tuple[
+    NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.bool_], NDArray[np.int32]
+]:
+    """Внутреннее ядро: возвращает координаты, uvw, дальность и диагностику."""
     asq, bsq, ab = inv.asq, inv.bsq, inv.ab
     denom = inv.denominator
 
@@ -225,7 +225,11 @@ def solve_from_invariants(
     finite_in = np.isfinite(asq) & np.isfinite(bsq) & np.isfinite(ab)
     reasons |= np.where(finite_in, 0, REASON_NONFINITE)
 
-    denom_ok = denom > tol * max(float(b0) ** 2, 1.0)
+    # D имеет масштаб квадрата измеренного поля. Абсолютный порог,
+    # привязанный к max(B0**2, 1), отбрасывал практически все реальные поля
+    # (обычно 1e-12..1e-18 Тл²). Используем относительный допуск к A+B.
+    denom_scale = np.maximum(asq + bsq, EPS)
+    denom_ok = np.isfinite(denom) & (denom > tol * denom_scale)
     reasons |= np.where(denom_ok, 0, REASON_DENOM)
 
     safe_denom = np.where(denom_ok, denom, np.nan)
@@ -253,7 +257,22 @@ def solve_from_invariants(
     points = r[..., np.newaxis] * uvw
     valid = reasons == REASON_OK
     points = np.where(valid[..., np.newaxis], points, np.nan)
+    uvw = np.where(valid[..., np.newaxis], uvw, np.nan)
     r = np.where(valid, r, np.nan)
+    return points, uvw, r, valid, reasons
+
+
+def solve_from_invariants(
+    inv: ABInvariants,
+    b0: float,
+    *,
+    tol: float = _DEFAULT_TOL,
+    uvw_tol: float = 1e-6,
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.bool_], NDArray[np.int32]]:
+    """Ядро решения по инвариантам: ``(points, r, valid, reasons)``."""
+    points, _uvw, r, valid, reasons = _solve_from_invariants_full(
+        inv, b0, tol=tol, uvw_tol=uvw_tol
+    )
     return points, r, valid, reasons
 
 
@@ -306,7 +325,7 @@ def solve_position(
         pass
 
     inv = ab_invariants(a, b)
-    points, r, valid, reasons = solve_from_invariants(
+    points, uvw, r, valid, reasons = _solve_from_invariants_full(
         inv, b0, tol=tol, uvw_tol=uvw_tol
     )
 
@@ -317,12 +336,13 @@ def solve_position(
             reasons = reasons | np.where(neg_y, REASON_UVW, 0)
             valid = reasons == REASON_OK
             points = np.where(valid[..., np.newaxis], points, np.nan)
+            uvw = np.where(valid[..., np.newaxis], uvw, np.nan)
     elif pol is QuadrantPolicy.CLIP:
         points = np.where(np.isnan(points), np.nan, np.maximum(points, 0.0))
+        # CLIP меняет координаты, так что в этом специальном режиме направление
+        # восстанавливаем из уже обрезанных точек.
+        uvw = points / np.where(r > 0, r, np.nan)[..., np.newaxis]
 
-    uvw = np.stack([calc_x(1.0, np.ones_like(r)) * 0 + points[..., 0] / np.where(r > 0, r, np.nan),
-                    points[..., 1] / np.where(r > 0, r, np.nan),
-                    points[..., 2] / np.where(r > 0, r, np.nan)], axis=-1)
     uvw_n = norm(uvw, axis=-1)
 
     return PositionSolution(

@@ -383,14 +383,26 @@ def monte_carlo(
         valid_stack[i] = res.valid
 
     err_norm = np.linalg.norm(err_stack, axis=-1)
-    with np.errstate(invalid="ignore"):
-        mean_norm = np.nanmean(err_norm, axis=0)
-        std_norm = np.nanstd(err_norm, axis=0)
-        rms_pt = np.sqrt(np.nanmean(err_norm**2, axis=0))
-        rms_comp = np.sqrt(np.nanmean(np.nan_to_num(err_stack) ** 2, axis=(0, 1)))
+    valid_norm = valid_stack & np.isfinite(err_norm)
+    counts = np.sum(valid_norm, axis=0)
+    sum_norm = np.sum(np.where(valid_norm, err_norm, 0.0), axis=0)
+    sum_norm_sq = np.sum(np.where(valid_norm, err_norm**2, 0.0), axis=0)
+    mean_norm = np.full(n_pts, np.nan, dtype=np.float64)
+    mean_sq_norm = np.full(n_pts, np.nan, dtype=np.float64)
+    np.divide(sum_norm, counts, out=mean_norm, where=counts > 0)
+    np.divide(sum_norm_sq, counts, out=mean_sq_norm, where=counts > 0)
+    rms_pt = np.sqrt(mean_sq_norm)
+    variance_num = np.sum(
+        np.where(valid_norm, (err_norm - mean_norm[np.newaxis, :]) ** 2, 0.0), axis=0
+    )
+    variance = np.full(n_pts, np.nan, dtype=np.float64)
+    np.divide(variance_num, counts, out=variance, where=counts > 0)
+    std_norm = np.sqrt(variance)
+    n_valid = int(np.count_nonzero(valid_norm))
+    component_sum = np.sum(np.where(valid_norm[..., np.newaxis], err_stack**2, 0.0), axis=(0, 1))
+    rms_comp = np.sqrt(component_sum / n_valid) if n_valid else np.full(3, np.nan)
 
-    finite = np.isfinite(err_norm)
-    all_vals = err_norm[finite]
+    all_vals = err_norm[valid_norm]
     return MonteCarloSummary(
         n_trials=len(results),
         error_norm_mean=mean_norm,

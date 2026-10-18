@@ -83,8 +83,14 @@ class GaussianNoise(AdditiveNoise):
             z = self._white(shape, rng)                # (..., 3)
             out = z @ L.T
         else:
-            s = broadcast_sigma(self.sigma, shape)
-            out = s * self._white(shape, rng)
+            z = self._white(shape, rng)
+            sigma = np.asarray(self.sigma, dtype=np.float64)
+            if sigma.ndim == 0 and not self.relative:
+                # Для обычного скалярного шума не нужен массив sigma размером
+                # со всем сигналом (временной ряд × точки × оси).
+                out = float(sigma) * z
+            else:
+                out = broadcast_sigma(sigma, shape) * z
 
         if self.relative:
             if reference is None:
