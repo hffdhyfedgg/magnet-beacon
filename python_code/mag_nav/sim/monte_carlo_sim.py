@@ -86,7 +86,7 @@ class MonteCarloResult:
         return (
             f"MonteCarlo[{self.n_trials} trials × {self.n_points} pts]: "
             f"L2={self.l2:.4e} м, L∞={self.l_inf:.4e} м, "
-            f"L2_rel={self.l2_relative:.3e}, valid={100*self.validity_ratio:.1f}%"
+            f"L2_rel={self.l2_relative:.3e}, valid={100 * self.validity_ratio:.1f}%"
         )
 
     def __repr__(self) -> str:
@@ -290,7 +290,11 @@ class MonteCarloSimulator:
         with np.errstate(invalid="ignore"):
             l2_per_point = np.sqrt(np.nanmean(err_norm_masked**2, axis=0))
             all_valid_norms = err_norm[valid]
-            l2_global = float(np.sqrt(np.mean(all_valid_norms**2))) if all_valid_norms.size else float("nan")
+            l2_global = (
+                float(np.sqrt(np.mean(all_valid_norms**2)))
+                if all_valid_norms.size
+                else float("nan")
+            )
 
         # Относительная: нормировка на среднюю дальность
         r_true = norm(self.trajectory - self.source.origin, axis=-1)
