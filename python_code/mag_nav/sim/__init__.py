@@ -1,5 +1,7 @@
 """Симуляция: траектории, сценарии, визуализация."""
 
+from . import visualize
+from .monte_carlo_sim import MonteCarloResult, MonteCarloSimulator
 from .scenario import (
     MonteCarloSummary,
     Scenario,
@@ -22,7 +24,6 @@ from .trajectory import (
     uniform_moving_observer,
     waypoint_path,
 )
-from . import visualize
 
 __all__ = [
     "Scenario",
@@ -44,4 +45,6 @@ __all__ = [
     "random_first_octant",
     "uniform_moving_observer",
     "visualize",
+    "MonteCarloSimulator",
+    "MonteCarloResult",
 ]
